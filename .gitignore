@@ -1,0 +1,6 @@
+app/vendor/
+app/build/
+app/saida/
+app/dados/
+app/composer.phar
+app/composer.lock

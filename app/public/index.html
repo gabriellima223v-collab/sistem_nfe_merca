@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDV Mercadinho</title>
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icone.svg">
+<meta name="theme-color" content="#0f2a1d">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app" class="hide">
+  <aside>
+    <div class="marca">
+      <div class="logo"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20.5" r="1.2"/><circle cx="17" cy="20.5" r="1.2"/></svg></div>
+      <div><b id="nomeLoja">Mercadinho</b><small id="nomeUser"></small></div>
+    </div>
+    <nav id="menu"></nav>
+    <div class="rodape">
+      <button id="btnMini" title="Recolher menu"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg><span>Recolher menu</span></button>
+      <button id="btnSair"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg><span>Trocar usuário</span></button>
+    </div>
+  </aside>
+  <main>
+    <div class="topo"><h1 id="titulo"></h1><div class="esp"></div><div id="topoExtra" class="linha"></div><span id="pillFiscal"></span></div>
+    <div class="conteudo" id="tela"></div>
+  </main>
+</div>
+<div id="cheia"></div>
+<div id="modais"></div>
+<div id="toasts"></div>
+<div id="impressao"></div>
+<script src="qr.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

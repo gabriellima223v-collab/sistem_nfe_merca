@@ -1,0 +1,103 @@
+==============================================================
+  PDV MERCADINHO - Caixa, NFC-e, estoque, fiado e painel do dono
+==============================================================
+
+O sistema roda no próprio computador do caixa. Não tem mensalidade
+de servidor nem de API: a nota fiscal é emitida pela biblioteca
+gratuita sped-nfe (NFePHP), direto na SEFAZ do estado.
+Se a internet cair, ele continua vendendo (contingência offline) e
+transmite as notas sozinho quando a conexão volta.
+
+
+--------------------------------------------------------------
+1) INSTALAR
+--------------------------------------------------------------
+ Baixe pelo botão "Baixe aqui" do site, dê dois cliques no
+ PDV-Mercadinho-Setup.exe e clique em Instalar. Não precisa de
+ internet nem de senha de administrador. O sistema fica em C:\PDV,
+ abre sozinho quando o Windows liga e cria o ícone na área de trabalho.
+ Na primeira vez ele pede a CHAVE DE ACESSO (só uma vez).
+
+ Para ATUALIZAR: instale a versão nova por cima. Vendas, produtos e o
+ certificado (C:\PDV\dados) são mantidos.
+
+ Se o Windows mostrar "O Windows protegeu o computador", clique em
+ "Mais informações" > "Executar assim mesmo".
+
+
+--------------------------------------------------------------
+2) PRIMEIRA VEZ QUE ABRIR
+--------------------------------------------------------------
+Aparece o assistente com duas opções:
+
+ • VER FUNCIONANDO AGORA  -> loja de exemplo com 40 produtos e 30 dias
+   de vendas. Notas e maquininha simuladas. Use para apresentar.
+   Senhas: gerente 1234 / caixa 1111
+
+ • CONFIGURAR A MINHA LOJA -> CNPJ (busca os dados sozinho),
+   certificado A1 (.pfx + senha), CSC e ID do CSC, série e número.
+   Comece em "Teste (homologação)": as notas vão para a SEFAZ mas não
+   têm valor fiscal. Quando estiver tudo certo, troque para "Produção"
+   em Configurações.
+
+Para sair da demonstração e configurar a loja de verdade: feche o
+programa, rode C:\PDV\Desligar servidor.bat, apague a pasta
+C:\PDV\dados e abra de novo pelo ícone.  (Apagar a pasta dados apaga TUDO: vendas, produtos etc.)
+
+
+--------------------------------------------------------------
+3) ATALHOS DO CAIXA
+--------------------------------------------------------------
+ Leitor de código de barras ... só bipar (o cursor já fica no campo)
+ 3*  + código ................. vende 3 unidades
+ Digitar nome + Enter ......... busca o produto
+ F2 Buscar   F3 Quantidade   F4 Desconto   F6 CPF/Cliente
+ F8 Remover item   F9 Cancelar venda   F10 Finalizar
+ Enter com o campo vazio ...... vai para o pagamento
+ No pagamento: setas ↑ ↓ trocam a forma, Enter lança o valor
+ Depois da venda: P imprime, Enter começa a próxima
+
+Balança: etiquetas que começam com 2 são lidas sozinhas. Cadastre o
+"Código na balança" em cada produto vendido no peso. As posições do
+código e do valor na etiqueta são ajustáveis em Configurações.
+
+Impressora térmica: deixe a impressora de cupom (80mm) como PADRÃO
+do Windows. O sistema imprime direto, sem abrir janela de impressão.
+
+
+--------------------------------------------------------------
+4) O QUE O SISTEMA FAZ
+--------------------------------------------------------------
+ • Caixa: abertura, sangria, suprimento, fechamento com conferência
+   do dinheiro e resumo pronto para enviar no WhatsApp do dono.
+ • NFC-e: emissão, cancelamento, contingência offline, reemissão de
+   rejeitadas, XMLs do mês em .zip para o contador.
+ • Maquininha: separada (caixa confirma) ou Mercado Pago Point
+   integrada (o valor vai sozinho). Conciliação do extrato da
+   maquininha com as vendas (pega erro e desvio).
+ • Estoque: entrada pelo XML da nota do fornecedor, estoque mínimo,
+   sugestão de compra, alerta de validade, promoção por quantidade.
+ • Fiado: limite por cliente, extrato, recebimento e cobrança pelo
+   WhatsApp.
+ • Painel do dono: faturamento, lucro, margem, curva ABC, horários de
+   movimento, produtos parados.
+ • Importação do cadastro do sistema antigo por planilha CSV.
+ • Usuários com senha (gerente e caixa). Desconto, sangria e
+   cancelamento pedem a senha do gerente.
+
+
+--------------------------------------------------------------
+5) PROBLEMAS COMUNS
+--------------------------------------------------------------
+ • "Certificado em formato antigo" / não abre com a senha certa:
+   dê dois cliques no .pfx, instale no Windows, depois abra
+   "certmgr.msc" > Pessoal > Certificados > botão direito no
+   certificado > Todas as tarefas > Exportar > "Sim, exportar a chave
+   privada" > marque "AES256-SHA256" > salve um novo .pfx e envie esse.
+ • Rejeição de NCM/CFOP/CSOSN: corrija o produto (Produtos > clique
+   nele > Dados fiscais) e use "Tentar emitir de novo" na venda.
+   Confira a tributação com o contador antes de ir para produção.
+ • Tela não abre: rode "Desligar servidor.bat" e abra o ícone de novo.
+ • Cópia de segurança: Configurações > "Baixar cópia de segurança".
+   Os dados ficam em  C:\PDV\dados  (copie essa pasta para um pendrive
+   de vez em quando).

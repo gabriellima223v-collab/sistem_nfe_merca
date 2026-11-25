@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PDV Mercadinho</title>
+<link rel="icon" href="icone.svg">
+<style>
+/*
+ VOICE: direto, de balcão — um botão que resolve
+ IDEA: a fita do caixa saindo da impressora
+ PICTURE: um cupom fiscal ilustrado ao lado do botão de baixar
+ COLOUR: verde-folha profundo, creme de papel, tomate nos alertas
+ LAYOUT: topo com acesso restrito à direita, herói com download, painel com menu lateral retrátil
+*/
+:root{--verde:#0b6b43;--verde2:#0e8a57;--vcl:#e3f3ea;--tomate:#d94a2b;--tcl:#fde9e4;--ambar:#b7791f;--acl:#fdf3dc;--bg:#f3f4f1;--ink:#17211b;--mut:#5d6b62;--linha:#e2e6e0;--side:#0f2a1d;--papel:#fffdf6}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.55 "Segoe UI",system-ui,-apple-system,Roboto,Arial,sans-serif;overflow-x:clip}
+button,input,select{font:inherit;color:inherit}
+.hide{display:none!important}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--linha);background:#fff;border-radius:10px;padding:9px 15px;font-weight:600;min-height:44px;cursor:pointer;white-space:nowrap;text-decoration:none;color:var(--ink)}
+.btn:hover{background:#fafbf9}.btn.pri{background:var(--verde);border-color:var(--verde);color:#fff}.btn.pri:hover{background:var(--verde2)}
+.btn.dan{color:var(--tomate);border-color:#f1c4b8}.btn.sm{min-height:34px;padding:5px 11px;font-size:14px}
+input,select{width:100%;border:1px solid #cfd6cf;border-radius:10px;padding:10px 12px;background:#fff;min-height:44px;font-size:16px}
+input:focus,select:focus{outline:3px solid rgba(14,138,87,.25);border-color:var(--verde2)}
+label{display:block;font-size:13px;font-weight:600;color:var(--mut);margin-bottom:5px}
+.campo{margin-bottom:12px}
+
+/* --- Site público --- */
+header.top{display:flex;align-items:center;gap:12px;padding:16px max(5vw,16px);background:var(--side);color:#fff}
+.logo{width:40px;height:40px;border-radius:11px;background:linear-gradient(145deg,#19a768,#0b6b43);display:grid;place-items:center;flex:none}
+header.top b{font-size:18px}header.top .esp{flex:1}
+header.top .btn{background:transparent;color:#cfe3d7;border-color:rgba(255,255,255,.2)}
+header.top .btn:hover{background:rgba(255,255,255,.08);color:#fff}
+.heroi{background:var(--side);color:#fff;padding:clamp(32px,6vw,80px) max(5vw,16px) clamp(40px,7vw,96px);display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:40px;align-items:center}
+.heroi h1{font-size:clamp(34px,5vw,52px);line-height:1.05;margin:0 0 16px;text-wrap:balance;letter-spacing:-.5px}
+.heroi p{color:#bcd9c8;font-size:18px;max-width:560px;margin:0 0 28px}
+.baixar{font-size:20px;min-height:64px;padding:14px 30px;border-radius:14px;background:#3fd18a;border-color:#3fd18a;color:#0b2a1b;box-shadow:0 10px 30px rgba(63,209,138,.3)}
+.baixar:hover{background:#5ae09d}
+.req{color:#8fb7a0;font-size:14px;margin-top:12px}
+.cupom{background:var(--papel);color:#111;width:min(300px,100%);margin:0 auto;padding:18px 16px 26px;font:13px/1.45 ui-monospace,Consolas,monospace;box-shadow:0 30px 60px rgba(0,0,0,.35);transform:rotate(2.5deg);position:relative;clip-path:polygon(0 0,100% 0,100% 97%,95% 100%,90% 97%,85% 100%,80% 97%,75% 100%,70% 97%,65% 100%,60% 97%,55% 100%,50% 97%,45% 100%,40% 97%,35% 100%,30% 97%,25% 100%,20% 97%,15% 100%,10% 97%,5% 100%,0 97%)}
+.cupom .c{text-align:center}.cupom hr{border:0;border-top:1px dashed #555;margin:8px 0}
+.cupom .l{display:flex;justify-content:space-between}.cupom .t{font-weight:800;font-size:15px}
+.cupom .ok{border:1.5px solid #111;text-align:center;font-weight:700;padding:4px;margin-top:8px}
+.passos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:18px;padding:clamp(28px,4vw,56px) max(5vw,16px);max-width:1240px;margin:0 auto}
+.passo{background:#fff;border-radius:16px;padding:22px;box-shadow:0 1px 2px rgba(16,32,24,.06),0 6px 20px rgba(16,32,24,.06)}
+.passo .n{width:36px;height:36px;border-radius:50%;background:var(--vcl);color:var(--verde);font-weight:800;display:grid;place-items:center;margin-bottom:10px}
+.passo h3{margin:0 0 6px;font-size:18px}.passo p{margin:0;color:var(--mut)}
+.recursos{max-width:1240px;margin:0 auto;padding:0 max(5vw,16px) 56px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.recursos div{border-left:3px solid var(--verde2);padding:4px 0 4px 14px}.recursos b{display:block}.recursos span{color:var(--mut);font-size:15px}
+footer{text-align:center;color:var(--mut);font-size:14px;padding:24px}
+@media(max-width:860px){.heroi{grid-template-columns:1fr}.passos{grid-template-columns:1fr}.recursos{grid-template-columns:1fr 1fr}.cupom{transform:none}}
+@media(max-width:520px){.recursos{grid-template-columns:1fr}header.top b{font-size:16px}}
+
+/* --- Login --- */
+.fundo{position:fixed;inset:0;background:rgba(10,24,16,.55);display:grid;place-items:center;z-index:50;padding:20px}
+.caixa{background:#fff;border-radius:18px;width:min(440px,100%);padding:24px;box-shadow:0 30px 80px rgba(0,0,0,.3);max-height:calc(100vh - 40px);overflow:auto}
+.caixa h2{margin:0 0 14px;font-size:20px}
+.caixa .acoes{display:flex;gap:10px;justify-content:flex-end;margin-top:6px}
+
+/* --- Painel --- */
+#painel{position:fixed;inset:0;display:grid;grid-template-columns:var(--sw,230px) 1fr;background:var(--bg);z-index:40;transition:grid-template-columns .2s}
+#painel.mini{--sw:66px}
+#painel aside{background:var(--side);color:#dfeee5;display:flex;flex-direction:column;overflow:hidden}
+#painel .marca{display:flex;align-items:center;gap:10px;padding:14px;border-bottom:1px solid rgba(255,255,255,.08);min-height:66px;white-space:nowrap}
+#painel nav{flex:1;padding:10px 8px}
+#painel nav a,#painel .rod button{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:10px;color:#cfe3d7;text-decoration:none;font-weight:500;white-space:nowrap;background:none;border:0;width:100%;cursor:pointer}
+#painel nav a:hover,#painel .rod button:hover{background:#143826;color:#fff}
+#painel nav a.on{background:#1d4d34;color:#fff;box-shadow:inset 3px 0 0 #3fd18a}
+#painel svg{flex:none}
+#painel.mini nav span,#painel.mini .rod span,#painel.mini .marca b{display:none}
+#painel .rod{padding:8px;border-top:1px solid rgba(255,255,255,.08)}
+#painel main{overflow:auto;padding:22px}
+.tt{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:16px}.tt h1{margin:0;font-size:22px;flex:1}
+.cards{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;margin-bottom:16px}
+.card{background:#fff;border-radius:14px;padding:16px;box-shadow:0 1px 2px rgba(16,32,24,.06),0 6px 20px rgba(16,32,24,.06)}
+.card .r{font-size:13px;color:var(--mut);font-weight:600}.card .v{font-size:26px;font-weight:800}
+table{width:100%;border-collapse:collapse}
+th{font-size:12px;color:var(--mut);text-align:left;padding:9px 10px;border-bottom:1px solid var(--linha);white-space:nowrap}
+td{padding:10px;border-bottom:1px solid #eef1ec;vertical-align:middle}
+.scroll{overflow-x:auto}
+.chip{display:inline-block;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;white-space:nowrap}
+.c-ok{background:var(--vcl);color:var(--verde)}.c-er{background:var(--tcl);color:var(--tomate)}.c-av{background:var(--acl);color:var(--ambar)}.c-in{background:#eef1ec;color:var(--mut)}
+.chave{font:600 14px ui-monospace,Consolas,monospace;letter-spacing:.5px;white-space:nowrap}
+.mut{color:var(--mut);font-size:13px}
+.acoesL{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+#toasts{position:fixed;right:20px;bottom:20px;display:flex;flex-direction:column;gap:8px;z-index:90}
+.toast{background:var(--ink);color:#fff;padding:12px 16px;border-radius:12px;max-width:420px;font-weight:500}.toast.er{background:var(--tomate)}.toast.ok{background:var(--verde)}
+@media(max-width:900px){.cards{grid-template-columns:1fr 1fr}}
+@media(max-width:600px){#painel{--sw:66px}#painel nav span,#painel .rod span,#painel .marca b{display:none}#painel main{padding:14px}.cards{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<!-- ================= SITE PÚBLICO ================= -->
+<div id="site">
+  <header class="top">
+    <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20.5" r="1"/><circle cx="17" cy="20.5" r="1"/></svg></div>
+    <b>PDV Mercadinho</b><div class="esp"></div>
+    <button class="btn sm" id="abrirLogin"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Área restrita</button>
+  </header>
+  <section class="heroi">
+    <div>
+      <h1>O caixa do seu mercadinho, com nota fiscal, num clique.</h1>
+      <p>Vende com leitor de código de barras e balança, emite NFC-e direto na SEFAZ, controla estoque e fiado, e continua vendendo mesmo sem internet.</p>
+      <a class="btn baixar" id="baixar" href="#"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M4 21h16"/></svg>Baixe aqui</a>
+      <div class="req" id="versao">Windows 10 ou 11 · instalação em 1 minuto · não precisa de administrador</div>
+    </div>
+    <div class="cupom" aria-hidden="true">
+      <div class="c"><b>MERCADINHO BOM PREÇO</b><br>NFC-e · Documento Auxiliar</div><hr>
+      <div class="l"><span>Arroz Tipo 1 5kg</span><span>27,90</span></div>
+      <div class="l"><span>Feijão Carioca 1kg</span><span>8,49</span></div>
+      <div class="l"><span>Café Torrado 500g</span><span>18,90</span></div>
+      <div class="l"><span>Queijo Mussarela 0,354kg</span><span>15,90</span></div>
+      <div class="l"><span>Cerveja Lata x12</span><span>41,88</span></div><hr>
+      <div class="l t"><span>TOTAL</span><span>R$ 113,07</span></div>
+      <div class="l"><span>Crédito · aprovado</span><span>113,07</span></div>
+      <div class="ok">AUTORIZADA PELA SEFAZ</div>
+    </div>
+  </section>
+  <section class="passos">
+    <div class="passo"><div class="n">1</div><h3>Baixe e instale</h3><p>Dois cliques no arquivo baixado e "Instalar". O ícone aparece na área de trabalho.</p></div>
+    <div class="passo"><div class="n">2</div><h3>Digite sua chave</h3><p>Só na primeira vez. Depois o sistema abre direto, junto com o Windows.</p></div>
+    <div class="passo"><div class="n">3</div><h3>Configure e venda</h3><p>Informe o CNPJ, o certificado A1 e o CSC. Em 5 minutos o caixa está emitindo nota.</p></div>
+  </section>
+  <section class="recursos">
+    <div><b>NFC-e e contingência</b><span>Nota direto na SEFAZ e venda sem internet</span></div>
+    <div><b>Estoque pelo XML</b><span>A nota do fornecedor entra sozinha</span></div>
+    <div><b>Fiado e WhatsApp</b><span>Limite por cliente e cobrança com um clique</span></div>
+    <div><b>Painel do dono</b><span>Lucro, curva ABC e o que comprar</span></div>
+  </section>
+  <footer>PDV Mercadinho · EXECORA</footer>
+</div>
+
+<!-- ================= PAINEL DO DESENVOLVEDOR ================= -->
+<div id="painel" class="hide">
+  <aside>
+    <div class="marca"><div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><b>Área restrita</b></div>
+    <nav>
+      <a href="#" data-v="licencas" class="on"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M17 6l3 3M15 8l2 2"/></svg><span>Licenças</span></a>
+      <a href="#" data-v="entradas"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg><span>Entradas</span></a>
+      <a href="#" data-v="config"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg><span>Configurações</span></a>
+    </nav>
+    <div class="rod">
+      <button id="mini"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 6l-6 6 6 6"/></svg><span>Recolher menu</span></button>
+      <button id="sair"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg><span>Sair</span></button>
+    </div>
+  </aside>
+  <main id="tela"></main>
+</div>
+<div id="modais"></div><div id="toasts"></div>
+
+<script src="config.js"></script>
+<script>
+{
+const C = window.PDV_CONFIG || {};
+const $ = (s, e = document) => e.querySelector(s), $$ = (s, e = document) => [...e.querySelectorAll(s)];
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const toast = (m, t = '') => { const d = document.createElement('div'); d.className = 'toast ' + t; d.textContent = m; $('#toasts').append(d); setTimeout(() => d.remove(), 4000); };
+const dataBR = s => s ? String(s).slice(0, 16).replace(/(\d{4})-(\d{2})-(\d{2})/, '$3/$2/$1') : '—';
+let token = (() => { try { return sessionStorage.getItem('pdv_adm') || ''; } catch (e) { return ''; } })();
+let cfgSrv = {}, lista = [], vista = 'licencas';
+
+async function api(acao, dados = {}) {
+  if (!C.API_URL || C.API_URL.includes('COLE_AQUI')) throw new Error('Configure a API_URL no arquivo config.js.');
+  let r;
+  try { r = await fetch(C.API_URL, { method: 'POST', body: JSON.stringify({ acao, token, ...dados }), headers: { 'Content-Type': 'text/plain;charset=utf-8' } }); }
+  catch (e) { throw new Error('Não consegui falar com o servidor de licenças.'); }
+  const j = await r.json();
+  if (!j.ok) { if (/Sessão expirada/.test(j.erro || '')) { sair(); } throw new Error(j.erro || 'Erro'); }
+  return j;
+}
+function modal(titulo, corpo, botoes) {
+  const f = document.createElement('div'); f.className = 'fundo';
+  f.innerHTML = `<div class="caixa"><h2>${titulo}</h2>${corpo}<div class="acoes"></div></div>`;
+  const fechar = () => f.remove();
+  botoes.forEach(b => { const e = document.createElement('button'); e.className = 'btn ' + (b.cls || ''); e.textContent = b.txt;
+    e.onclick = async () => { if (!b.acao) return fechar(); e.disabled = true; try { if (await b.acao(f) !== false) fechar(); } catch (x) { toast(x.message, 'er'); } e.disabled = false; }; $('.acoes', f).append(e); });
+  f.onclick = e => { if (e.target === f) fechar(); };
+  $('#modais').append(f); setTimeout(() => $('input', f)?.focus(), 30); return f;
+}
+
+// ---------- Site público ----------
+$('#baixar').href = C.DOWNLOAD_URL || '#';
+api('site').then(j => { cfgSrv = j; if (j.download) $('#baixar').href = j.download; if (j.versao) $('#versao').textContent = `Versão ${j.versao} · Windows 10 ou 11 · instalação em 1 minuto`; }).catch(() => {});
+$('#abrirLogin').onclick = () => token ? abrirPainel() : login();
+function login() {
+  const f = modal('Área restrita', `<div class="campo"><label for="sen">Senha de administrador</label><input id="sen" type="password" autocomplete="current-password"></div>`,
+    [{ txt: 'Cancelar' }, { txt: 'Entrar', cls: 'pri', acao: async f => { const r = await api('admin_login', { senha: $('#sen', f).value }); token = r.token; try { sessionStorage.setItem('pdv_adm', token); } catch (e) {} abrirPainel(); } }]);
+  $('#sen', f).onkeydown = e => { if (e.key === 'Enter') $('.acoes .pri', f).click(); };
+}
+function sair() { token = ''; try { sessionStorage.removeItem('pdv_adm'); } catch (e) {} $('#painel').classList.add('hide'); $('#site').classList.remove('hide'); }
+
+// ---------- Painel ----------
+function abrirPainel() {
+  $('#site').classList.add('hide'); $('#painel').classList.remove('hide');
+  try { $('#painel').classList.toggle('mini', localStorage.getItem('pdv_mini') === '1'); } catch (e) {}
+  ir(vista);
+}
+$('#mini').onclick = () => { const m = !$('#painel').classList.contains('mini'); $('#painel').classList.toggle('mini', m); try { localStorage.setItem('pdv_mini', m ? '1' : '0'); } catch (e) {} };
+$('#sair').onclick = sair;
+$$('#painel nav a').forEach(a => a.onclick = e => { e.preventDefault(); ir(a.dataset.v); });
+function ir(v) { vista = v; $$('#painel nav a').forEach(a => a.classList.toggle('on', a.dataset.v === v)); $('#tela').innerHTML = '<p class="mut">Carregando…</p>'; ({ licencas: telaLicencas, entradas: telaEntradas, config: telaConfig })[v]().catch(e => { $('#tela').innerHTML = `<p class="mut">${esc(e.message)}</p>`; }); }
+
+const hojeISO = () => new Date().toLocaleDateString('sv-SE');
+function situacao(l) {
+  if (l.Status === 'Bloqueada') return '<span class="chip c-er">Bloqueada</span>';
+  if (!l.Maquina) return '<span class="chip c-in">Aguardando ativar</span>';
+  const ult = l['Ultimo contato'] ? (Date.now() - new Date(String(l['Ultimo contato']).replace(' ', 'T'))) / 864e5 : 99;
+  return ult > 1 ? `<span class="chip c-av">Ativa · sem contato há ${Math.floor(ult)} dia(s)</span>` : '<span class="chip c-ok">Ativa · online</span>';
+}
+async function telaLicencas() {
+  lista = (await api('admin_listar')).lista;
+  const bloq = lista.filter(l => l.Status === 'Bloqueada').length, venc = lista.filter(l => l.Vencimento && String(l.Vencimento).slice(0, 10) < hojeISO() && l.Status !== 'Bloqueada').length;
+  $('#tela').innerHTML = `<div class="tt"><h1>Licenças</h1><input id="bus" placeholder="Buscar cliente ou chave" style="width:240px"><button class="btn pri" id="nova">+ Nova licença</button></div>
+    <div class="cards"><div class="card"><div class="r">Clientes</div><div class="v">${lista.length}</div></div><div class="card"><div class="r">Em uso</div><div class="v">${lista.filter(l => l.Maquina && l.Status !== 'Bloqueada').length}</div></div>
+    <div class="card"><div class="r">Bloqueadas</div><div class="v" style="color:var(--tomate)">${bloq}</div></div><div class="card"><div class="r">Vencidas (não bloqueadas)</div><div class="v" style="color:var(--ambar)">${venc}</div></div></div>
+    <div class="card scroll"><table><thead><tr><th>Cliente</th><th>Chave</th><th>Situação</th><th>Vencimento</th><th>Computador</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>`;
+  const desenha = () => {
+    const t = $('#bus').value.toLowerCase();
+    const l = lista.filter(x => !t || String(x.Cliente).toLowerCase().includes(t) || String(x.Chave).toLowerCase().includes(t));
+    $('#tb').innerHTML = l.map(x => { const v = String(x.Vencimento || '').slice(0, 10); const vencida = v && v < hojeISO();
+      return `<tr><td><b>${esc(x.Cliente)}</b><div class="mut">${esc(x.Telefone)}${x.CNPJ ? ' · ' + esc(x.CNPJ) : ''}</div></td><td class="chave">${esc(x.Chave)}</td><td>${situacao(x)}<div class="mut">último contato ${dataBR(x['Ultimo contato'])}</div></td>
+      <td>${v ? `<span class="${vencida ? 'chip c-av' : ''}">${dataBR(v)}${vencida ? ' · vencida' : ''}</span>` : '—'}</td><td>${esc(x['Nome do PC'] || '—')}<div class="mut">versão ${esc(x.Versao || '—')}</div></td>
+      <td><div class="acoesL">${x.Status === 'Bloqueada' ? `<button class="btn sm pri" data-a="desbloquear" data-c="${esc(x.Chave)}">Desbloquear</button>` : `<button class="btn sm dan" data-a="bloquear" data-c="${esc(x.Chave)}">Bloquear</button>`}
+        <button class="btn sm" data-a="copiar" data-c="${esc(x.Chave)}">Copiar chave</button><button class="btn sm" data-a="editar" data-c="${esc(x.Chave)}">Editar</button><button class="btn sm" data-a="entradas" data-c="${esc(x.Chave)}">Entradas</button></div></td></tr>`; }).join('') || '<tr><td colspan="6" class="mut" style="text-align:center;padding:30px">Nenhuma licença ainda. Clique em "Nova licença".</td></tr>';
+    $$('#tb [data-a]').forEach(b => b.onclick = () => acao(b.dataset.a, lista.find(x => x.Chave === b.dataset.c)));
+  };
+  $('#bus').oninput = desenha; $('#nova').onclick = () => editar({}); desenha();
+}
+async function acao(a, l) {
+  if (a === 'bloquear') { modal('Bloquear acesso', `<p>Bloquear <b>${esc(l.Cliente)}</b>? O sistema dele trava em até 10 minutos e mostra a tela de bloqueio com o seu contato.</p>`, [{ txt: 'Cancelar' }, { txt: 'Bloquear', cls: 'pri', acao: async () => { await api('admin_status', { chave: l.Chave, status: 'Bloqueada' }); toast('Bloqueado.', 'ok'); telaLicencas(); } }]); return; }
+  if (a === 'desbloquear') { await api('admin_status', { chave: l.Chave, status: 'Ativa' }); toast('Liberado. O cliente clica em "Verificar de novo" ou espera até 10 minutos.', 'ok'); return telaLicencas(); }
+  if (a === 'copiar') { try { await navigator.clipboard.writeText(l.Chave); toast('Chave copiada.', 'ok'); } catch (e) { toast(l.Chave); } return; }
+  if (a === 'editar') return editar(l);
+  if (a === 'entradas') return telaEntradas(l.Chave);
+}
+function editar(l) {
+  const c = (k, rot, tipo = 'text') => `<div class="campo"><label>${rot}</label><input data-k="${k}" type="${tipo}" value="${esc(tipo === 'date' ? String(l[k] || '').slice(0, 10) : l[k] || '')}"></div>`;
+  const tel = String(l.Telefone || '').replace(/\D/g, '');
+  const msg = l.Chave ? `Olá! Sua chave de acesso do PDV Mercadinho é: ${l.Chave}\nBaixe o sistema em: ${location.origin}` : '';
+  modal(l.Chave ? 'Editar licença' : 'Nova licença', `${c('Cliente', 'Nome do cliente / loja')}${c('Telefone', 'WhatsApp')}${c('CNPJ', 'CNPJ')}${c('Vencimento', 'Vencimento do plano', 'date')}${c('Obs', 'Observação')}
+    ${l.Chave ? `<p class="mut">Chave: <b class="chave">${esc(l.Chave)}</b>${tel ? ` · <a href="https://wa.me/55${tel}?text=${encodeURIComponent(msg)}" target="_blank">mandar chave no WhatsApp</a>` : ''}</p>` : ''}`,
+    [...(l.Chave ? [{ txt: 'Excluir', cls: 'dan', acao: async () => { if (!confirm('Excluir esta licença? O sistema do cliente para de funcionar.')) return false; await api('admin_excluir', { chave: l.Chave }); toast('Excluída.', 'ok'); telaLicencas(); } },
+      ...(l.Maquina ? [{ txt: 'Liberar troca de PC', acao: async () => { await api('admin_liberar_maquina', { chave: l.Chave }); toast('Pronto: a chave pode ser ativada em outro computador.', 'ok'); telaLicencas(); } }] : [])] : []),
+     { txt: 'Cancelar' },
+     { txt: 'Salvar', cls: 'pri', acao: async f => { const d = { Chave: l.Chave }; $$('[data-k]', f).forEach(i => d[i.dataset.k] = i.value.trim()); const r = await api('admin_salvar', { dados: d }); await telaLicencas();
+        if (!l.Chave) { const nova = lista.find(x => x.Chave === r.chave) || { ...d, Chave: r.chave }; toast('Licença criada: ' + r.chave, 'ok'); editar(nova); } } }]);
+}
+async function telaEntradas(chave = '') {
+  vista = 'entradas'; $$('#painel nav a').forEach(a => a.classList.toggle('on', a.dataset.v === 'entradas'));
+  if (!lista.length) lista = (await api('admin_listar')).lista;
+  const r = await api('admin_acessos', { chave });
+  $('#tela').innerHTML = `<div class="tt"><h1>Entradas</h1><select id="fc" style="width:auto"><option value="">Todos os clientes</option>${lista.map(l => `<option value="${esc(l.Chave)}" ${l.Chave === chave ? 'selected' : ''}>${esc(l.Cliente)}</option>`).join('')}</select><button class="btn" id="att">Atualizar</button></div>
+    <div class="card scroll"><table><thead><tr><th>Quando</th><th>Cliente</th><th>O que aconteceu</th><th>Usuário</th><th>Computador</th></tr></thead><tbody>
+    ${r.lista.map(e => `<tr><td style="white-space:nowrap">${dataBR(e.data)}</td><td>${esc(e.cliente)}</td><td>${/bloque|outro PC/i.test(e.evento) ? `<span class="chip c-er">${esc(e.evento)}</span>` : esc(e.evento)}</td><td>${esc(e.usuario)}</td><td>${esc(e.pc)}</td></tr>`).join('') || '<tr><td colspan="5" class="mut" style="text-align:center;padding:30px">Nenhuma entrada registrada.</td></tr>'}</tbody></table></div>
+    <p class="mut">Registra: ativação, cada login no caixa, abertura e fechamento de caixa e tentativas de uso bloqueado ou em outro computador.</p>`;
+  $('#fc').onchange = e => telaEntradas(e.target.value); $('#att').onclick = () => telaEntradas($('#fc').value);
+}
+async function telaConfig() {
+  const r = (await api('admin_config')).config;
+  $('#tela').innerHTML = `<div class="tt"><h1>Configurações</h1></div><div class="card" style="max-width:640px">
+    <div class="campo"><label>Link do instalador (botão "Baixe aqui")</label><input id="dl" value="${esc(r.DOWNLOAD_URL || C.DOWNLOAD_URL || '')}"></div>
+    <div class="campo"><label>Versão mostrada no site</label><input id="vs" value="${esc(r.VERSAO)}"></div>
+    <div class="campo"><label>Seu contato de suporte (aparece na tela de bloqueio do app)</label><input id="ct" value="${esc(r.CONTATO)}" placeholder="(11) 99999-8888"></div>
+    <div class="campo"><label>Nova senha de administrador (deixe em branco para manter)</label><input id="ns" type="password" autocomplete="new-password"></div>
+    <button class="btn pri" id="sv">Salvar</button></div>`;
+  $('#sv').onclick = async () => { try { await api('admin_config', { dados: { DOWNLOAD_URL: $('#dl').value, VERSAO: $('#vs').value, CONTATO: $('#ct').value, NOVA_SENHA: $('#ns').value } }); toast('Salvo.', 'ok'); if ($('#ns').value) { toast('Senha trocada. Entre de novo.'); sair(); } } catch (e) { toast(e.message, 'er'); } };
+}
+if (token) abrirPainel();
+}
+</script>
+</body>
+</html>

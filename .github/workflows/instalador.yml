@@ -1,0 +1,62 @@
+# Monta o instalador do PDV (PDV-Mercadinho-Setup.exe) num Windows do GitHub
+# e publica em Releases. Roda sozinho a cada mudança na pasta app/.
+name: Gerar instalador
+
+on:
+  push:
+    branches: [main]
+    paths: ['app/**', '.github/workflows/instalador.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  instalador:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: PHP para rodar o Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: curl, openssl, mbstring, zip, gd, fileinfo, soap, dom, xml, pdo_sqlite, sqlite3
+          tools: composer
+
+      - name: Biblioteca fiscal gratuita (sped-nfe)
+        run: composer install --no-dev --no-interaction --no-progress --optimize-autoloader
+
+      - name: PHP portátil que vai dentro do instalador
+        run: |
+          $ProgressPreference = 'SilentlyContinue'
+          Invoke-WebRequest 'https://windows.php.net/downloads/releases/latest/php-8.3-nts-Win32-vs16-x64-latest.zip' -OutFile php.zip
+          Expand-Archive php.zip -DestinationPath build\php -Force
+          Invoke-WebRequest 'https://curl.se/ca/cacert.pem' -OutFile build\php\cacert.pem
+          if (!(Test-Path build\php\php.exe)) { throw 'PHP não baixou' }
+
+      - name: Endereço do servidor de licenças
+        env:
+          LICENCA_URL: ${{ vars.LICENCA_URL }}
+        run: |
+          Set-Content -Path app\licenca_url.txt -Value "$env:LICENCA_URL" -NoNewline
+          if ([string]::IsNullOrWhiteSpace($env:LICENCA_URL)) { Write-Warning 'LICENCA_URL não configurada: o app vai rodar sem pedir chave.' }
+
+      - name: Montar instalador (Inno Setup)
+        run: |
+          $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
+          if (!(Test-Path $iscc)) { choco install innosetup -y --no-progress; }
+          & $iscc /Q "/DAppVersao=1.0.${{ github.run_number }}" instalador\pdv.iss
+          if (!(Test-Path saida\PDV-Mercadinho-Setup.exe)) { throw 'Instalador não foi gerado' }
+
+      - name: Publicar em Releases (o botão "Baixe aqui" pega sempre o mais novo)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: PDV Mercadinho 1.0.${{ github.run_number }}
+          files: app/saida/PDV-Mercadinho-Setup.exe
+          make_latest: true
