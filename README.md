@@ -1,4 +1,4 @@
-# PDV Mercadinho
+# PDV
 
 Caixa com NFC-e (biblioteca gratuita sped-nfe), estoque, fiado e painel do dono — com licença controlada pelo site.
 
@@ -21,7 +21,7 @@ licencas/   servidor de licenças (Apps Script + Planilha Google)
 ### 2. GitHub (instalador automático)
 1. **Settings → Secrets and variables → Actions → aba Variables → New repository variable**  
    Nome `LICENCA_URL`, valor: a URL `/exec` do passo 1.
-2. **Actions → Gerar instalador → Run workflow**. Em ~5 min o `PDV-Mercadinho-Setup.exe` aparece em **Releases**.
+2. **Actions → Gerar instalador → Run workflow**. Em ~5 min o `PDV-Setup.exe` aparece em **Releases**.
 3. O repositório precisa ser **público** para o link de download funcionar para os clientes
    (nada sensível fica no código: a senha e as licenças ficam no Google).
 

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>PDV Mercadinho</title>
+<title>PDV</title>
 <link rel="icon" href="icone.svg">
 <style>
 /*
@@ -95,7 +95,7 @@ td{padding:10px;border-bottom:1px solid #eef1ec;vertical-align:middle}
 <div id="site">
   <header class="top">
     <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h2l2.4 11.2a2 2 0 0 0 2 1.6h7.7a2 2 0 0 0 2-1.5L21 8H6.2"/><circle cx="10" cy="20.5" r="1"/><circle cx="17" cy="20.5" r="1"/></svg></div>
-    <b>PDV Mercadinho</b><div class="esp"></div>
+    <b>PDV</b><div class="esp"></div>
     <button class="btn sm" id="abrirLogin"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg>Área restrita</button>
   </header>
   <section class="heroi">
@@ -128,7 +128,7 @@ td{padding:10px;border-bottom:1px solid #eef1ec;vertical-align:middle}
     <div><b>Fiado e WhatsApp</b><span>Limite por cliente e cobrança com um clique</span></div>
     <div><b>Painel do dono</b><span>Lucro, curva ABC e o que comprar</span></div>
   </section>
-  <footer>PDV Mercadinho · EXECORA</footer>
+  <footer>PDV · EXECORA</footer>
 </div>
 
 <!-- ================= PAINEL DO DESENVOLVEDOR ================= -->
@@ -237,7 +237,7 @@ async function acao(a, l) {
 function editar(l) {
   const c = (k, rot, tipo = 'text') => `<div class="campo"><label>${rot}</label><input data-k="${k}" type="${tipo}" value="${esc(tipo === 'date' ? String(l[k] || '').slice(0, 10) : l[k] || '')}"></div>`;
   const tel = String(l.Telefone || '').replace(/\D/g, '');
-  const msg = l.Chave ? `Olá! Sua chave de acesso do PDV Mercadinho é: ${l.Chave}\nBaixe o sistema em: ${location.origin}` : '';
+  const msg = l.Chave ? `Olá! Sua chave de acesso do PDV é: ${l.Chave}\nBaixe o sistema em: ${location.origin}` : '';
   modal(l.Chave ? 'Editar licença' : 'Nova licença', `${c('Cliente', 'Nome do cliente / loja')}${c('Telefone', 'WhatsApp')}${c('CNPJ', 'CNPJ')}${c('Vencimento', 'Vencimento do plano', 'date')}${c('Obs', 'Observação')}
     ${l.Chave ? `<p class="mut">Chave: <b class="chave">${esc(l.Chave)}</b>${tel ? ` · <a href="https://wa.me/55${tel}?text=${encodeURIComponent(msg)}" target="_blank">mandar chave no WhatsApp</a>` : ''}</p>` : ''}`,
     [...(l.Chave ? [{ txt: 'Excluir', cls: 'dan', acao: async () => { if (!confirm('Excluir esta licença? O sistema do cliente para de funcionar.')) return false; await api('admin_excluir', { chave: l.Chave }); toast('Excluída.', 'ok'); telaLicencas(); } },

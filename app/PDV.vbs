@@ -1,4 +1,4 @@
-' PDV Mercadinho - abre como aplicativo
+' PDV - abre como aplicativo
 ' Liga o servidor local escondido e abre a janela sem barra de navegador
 Set sh = CreateObject("WScript.Shell")
 Set fs = CreateObject("Scripting.FileSystemObject")
@@ -7,7 +7,7 @@ sh.CurrentDirectory = pasta
 url = "http://127.0.0.1:8080/"
 
 If Not fs.FileExists(pasta & "\php\php.exe") Then
-  MsgBox "Arquivos do PDV incompletos. Reinstale o PDV Mercadinho.", 48, "PDV Mercadinho"
+  MsgBox "Arquivos do PDV incompletos. Reinstale o PDV.", 48, "PDV"
   WScript.Quit
 End If
 

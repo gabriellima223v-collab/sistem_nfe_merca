@@ -202,7 +202,7 @@ function montarXML(array $v, array $itens, array $pags, int $numero, int $serie,
     'cUF' => CUF[$uf], 'cNF' => $cNF, 'natOp' => 'VENDA', 'mod' => 65, 'serie' => $serie, 'nNF' => $numero,
     'dhEmi' => date('Y-m-d\TH:i:sP'), 'dhSaiEnt' => null, 'tpNF' => 1, 'idDest' => 1, 'cMunFG' => cfg('emp_cmun'), 'tpImp' => 4,
     'tpEmis' => $tpEmis, 'cDV' => 0, 'tpAmb' => $homolog ? 2 : 1, 'finNFe' => 1, 'indFinal' => 1, 'indPres' => 1, 'indIntermed' => 0,
-    'procEmi' => 0, 'verProc' => 'PDV-Mercadinho 1.0',
+    'procEmi' => 0, 'verProc' => 'PDV 1.0',
   ];
   if ($tpEmis === 9) { $ide->dhCont = date('Y-m-d\TH:i:sP'); $ide->xJust = 'Sem comunicacao com a SEFAZ no momento da venda'; }
   $nfe->tagide($ide);

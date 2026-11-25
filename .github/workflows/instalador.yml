@@ -1,4 +1,4 @@
-# Monta o instalador do PDV (PDV-Mercadinho-Setup.exe) num Windows do GitHub
+# Monta o instalador do PDV (PDV-Setup.exe) num Windows do GitHub
 # e publica em Releases. Roda sozinho a cada mudança na pasta app/.
 name: Gerar instalador
 
@@ -51,12 +51,12 @@ jobs:
           $iscc = 'C:\Program Files (x86)\Inno Setup 6\ISCC.exe'
           if (!(Test-Path $iscc)) { choco install innosetup -y --no-progress; }
           & $iscc /Q "/DAppVersao=1.0.${{ github.run_number }}" instalador\pdv.iss
-          if (!(Test-Path saida\PDV-Mercadinho-Setup.exe)) { throw 'Instalador não foi gerado' }
+          if (!(Test-Path saida\PDV-Setup.exe)) { throw 'Instalador não foi gerado' }
 
       - name: Publicar em Releases (o botão "Baixe aqui" pega sempre o mais novo)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v1.0.${{ github.run_number }}
-          name: PDV Mercadinho 1.0.${{ github.run_number }}
-          files: app/saida/PDV-Mercadinho-Setup.exe
+          name: PDV 1.0.${{ github.run_number }}
+          files: app/saida/PDV-Setup.exe
           make_latest: true

@@ -1,5 +1,5 @@
 /**
- * PDV Mercadinho - Servidor de licenças
+ * PDV - Servidor de licenças
  * Planilha Google + Apps Script (implantar como App da Web, acesso: "Qualquer pessoa")
  *
  * Primeira vez: rode a função "configurarSenha" (menu Executar) depois de trocar a senha abaixo.

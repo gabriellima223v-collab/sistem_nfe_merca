@@ -1,5 +1,5 @@
-; Instalador do PDV Mercadinho (Inno Setup 6)
-#define AppNome "PDV Mercadinho"
+; Instalador do PDV (Inno Setup 6)
+#define AppNome "PDV"
 #ifndef AppVersao
   #define AppVersao "1.0"
 #endif
@@ -14,7 +14,7 @@ DisableDirPage=yes
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 OutputDir=..\saida
-OutputBaseFilename=PDV-Mercadinho-Setup
+OutputBaseFilename=PDV-Setup
 SetupIconFile=..\public\icone.ico
 UninstallDisplayIcon={app}\public\icone.ico
 Compression=lzma2/ultra
@@ -30,18 +30,18 @@ Source: "..\public\*"; DestDir: "{app}\public"; Flags: recursesubdirs ignorevers
 Source: "..\app\*"; DestDir: "{app}\app"; Flags: recursesubdirs ignoreversion
 Source: "..\vendor\*"; DestDir: "{app}\vendor"; Flags: recursesubdirs ignoreversion skipifsourcedoesntexist
 Source: "..\build\php\*"; DestDir: "{app}\php"; Flags: recursesubdirs ignoreversion
-Source: "..\PDV Mercadinho.vbs"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\PDV.vbs"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\Desligar servidor.bat"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\LEIA-ME.txt"; DestDir: "{app}"; Flags: ignoreversion
 ; a pasta "dados" (vendas, produtos, certificado) nunca é sobrescrita nem apagada
 
 [Icons]
-Name: "{userdesktop}\{#AppNome}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\PDV Mercadinho.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\public\icone.ico"
-Name: "{userstartup}\{#AppNome}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\PDV Mercadinho.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\public\icone.ico"
-Name: "{userprograms}\{#AppNome}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\PDV Mercadinho.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\public\icone.ico"
+Name: "{userdesktop}\{#AppNome}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\PDV.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\public\icone.ico"
+Name: "{userstartup}\{#AppNome}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\PDV.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\public\icone.ico"
+Name: "{userprograms}\{#AppNome}"; Filename: "{sys}\wscript.exe"; Parameters: """{app}\PDV.vbs"""; WorkingDir: "{app}"; IconFilename: "{app}\public\icone.ico"
 
 [Run]
-Filename: "{sys}\wscript.exe"; Parameters: """{app}\PDV Mercadinho.vbs"""; Description: "Abrir o PDV agora"; Flags: postinstall nowait skipifsilent
+Filename: "{sys}\wscript.exe"; Parameters: """{app}\PDV.vbs"""; Description: "Abrir o PDV agora"; Flags: postinstall nowait skipifsilent
 
 [InstallDelete]
 Type: files; Name: "{app}\php\php.ini"

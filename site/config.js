@@ -7,5 +7,5 @@ window.PDV_CONFIG = {
 
   // Link do instalador (o GitHub atualiza sozinho a cada versão).
   // Pode ser trocado depois pela sua área restrita > Configurações.
-  DOWNLOAD_URL: 'https://github.com/gabriellima223v-collab/sistem_nfe_merca/releases/latest/download/PDV-Mercadinho-Setup.exe',
+  DOWNLOAD_URL: 'https://github.com/gabriellima223v-collab/sistem_nfe_merca/releases/latest/download/PDV-Setup.exe',
 };

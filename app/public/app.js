@@ -1,4 +1,4 @@
-/* PDV Mercadinho - interface (roda no navegador, em modo aplicativo) */
+/* PDV - interface (roda no navegador, em modo aplicativo) */
 {
 // ======================= Utilidades =======================
 const $ = (s, el = document) => el.querySelector(s);
@@ -128,7 +128,7 @@ function telaLogin() {
   const demo = (S.est?.ambiente || S.cfg.ambiente) === 'demo';
   $('#cheia').innerHTML = `<div class="tela-cheia"><div class="login">
     <div class="marca" style="justify-content:center;border:0;padding:0;min-height:0"><div class="logo">${ico('caixa', 24).replace('currentColor', '#fff')}</div></div>
-    <h2>${esc(S.cfg.emp_fantasia || 'PDV Mercadinho')}</h2><div style="color:var(--mut)">Digite sua senha</div>
+    <h2>${esc(S.cfg.emp_fantasia || 'PDV')}</h2><div style="color:var(--mut)">Digite sua senha</div>
     <div class="pinvis">${'<i></i>'.repeat(4)}</div>
     <div class="teclado">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-n="${n}">${n}</button>`).join('')}<button data-n="c" style="font-size:16px">Limpar</button><button data-n="0">0</button><button data-n="ok" style="background:var(--verde);color:#fff;font-size:16px">Entrar</button></div>
     ${demo ? '<p class="ajuda" style="margin-top:14px">Demonstração: gerente <b>1234</b> · caixa <b>1111</b></p>' : ''}
@@ -147,7 +147,7 @@ function telaLogin() {
 function montarApp() {
   $('#app').classList.remove('hide'); $('#cheia').innerHTML = '';
   $('#app').classList.toggle('mini', ler('mini', false));
-  $('#nomeLoja').textContent = S.cfg.emp_fantasia || S.cfg.emp_razao || 'Mercadinho';
+  $('#nomeLoja').textContent = S.cfg.emp_fantasia || S.cfg.emp_razao || 'PDV';
   $('#nomeUser').textContent = S.u.nome + (S.u.perfil === 'gerente' ? ' · gerente' : '');
   $('#menu').innerHTML = TELAS.filter(t => t.todos || S.u.perfil === 'gerente').map(t => `<a href="#${t.id}" data-t="${t.id}" title="${t.nome}">${ico(t.ic)}<span>${t.nome}</span><em class="bdg hide" data-b="${t.id}"></em></a>`).join('');
   $$('#menu a').forEach(a => a.onclick = e => { e.preventDefault(); ir(a.dataset.t); });

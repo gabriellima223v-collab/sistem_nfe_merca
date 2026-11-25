@@ -8,7 +8,7 @@
 function http(string $metodo, string $url, $corpo = null, array $headers = []): array {
   $ch = curl_init($url);
   curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 20, CURLOPT_CUSTOMREQUEST => $metodo,
-    CURLOPT_HTTPHEADER => array_merge(['Content-Type: application/json', 'User-Agent: PDV-Mercadinho'], $headers)]);
+    CURLOPT_HTTPHEADER => array_merge(['Content-Type: application/json', 'User-Agent: PDV'], $headers)]);
   if ($corpo !== null) curl_setopt($ch, CURLOPT_POSTFIELDS, is_string($corpo) ? $corpo : json_encode($corpo));
   $r = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); $err = curl_error($ch); curl_close($ch);
   if ($r === false) throw new Exception('Sem conexão com a internet (' . $err . ').');
@@ -123,7 +123,7 @@ function resumoCaixa(int $id): array {
 function textoFechamento(array $cx, array $r, float $contado): string {
   $f = fn($v) => 'R$ ' . number_format((float)$v, 2, ',', '.');
   $nomes = ['dinheiro' => 'Dinheiro', 'pix' => 'PIX', 'debito' => 'Débito', 'credito' => 'Crédito', 'fiado' => 'Fiado'];
-  $t = "*Fechamento de caixa - " . (cfg('emp_fantasia') ?: 'Mercadinho') . "*\n" . date('d/m/Y H:i') . " | Operador: {$cx['operador']}\n\n";
+  $t = "*Fechamento de caixa - " . (cfg('emp_fantasia') ?: 'PDV') . "*\n" . date('d/m/Y H:i') . " | Operador: {$cx['operador']}\n\n";
   $t .= "Vendas: {$r['vendas']} | Total: " . $f($r['total']) . "\n";
   foreach ($r['formas'] as $k => $v) $t .= '• ' . ($nomes[$k] ?? $k) . ': ' . $f($v) . "\n";
   if (!empty($r['mov']['sangria'])) $t .= 'Sangrias: ' . $f($r['mov']['sangria']) . "\n";

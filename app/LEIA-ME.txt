@@ -1,5 +1,5 @@
 ==============================================================
-  PDV MERCADINHO - Caixa, NFC-e, estoque, fiado e painel do dono
+  PDV - Caixa, NFC-e, estoque, fiado e painel do dono
 ==============================================================
 
 O sistema roda no próprio computador do caixa. Não tem mensalidade
@@ -13,7 +13,7 @@ transmite as notas sozinho quando a conexão volta.
 1) INSTALAR
 --------------------------------------------------------------
  Baixe pelo botão "Baixe aqui" do site, dê dois cliques no
- PDV-Mercadinho-Setup.exe e clique em Instalar. Não precisa de
+ PDV-Setup.exe e clique em Instalar. Não precisa de
  internet nem de senha de administrador. O sistema fica em C:\PDV,
  abre sozinho quando o Windows liga e cria o ícone na área de trabalho.
  Na primeira vez ele pede a CHAVE DE ACESSO (só uma vez).
