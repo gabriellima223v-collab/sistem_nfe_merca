@@ -43,8 +43,8 @@ jobs:
         env:
           LICENCA_URL: ${{ vars.LICENCA_URL }}
         run: |
-          Set-Content -Path app\licenca_url.txt -Value "$env:LICENCA_URL" -NoNewline
-          if ([string]::IsNullOrWhiteSpace($env:LICENCA_URL)) { Write-Warning 'LICENCA_URL não configurada: o app vai rodar sem pedir chave.' }
+          if (![string]::IsNullOrWhiteSpace($env:LICENCA_URL)) { Set-Content -Path app\licenca_url.txt -Value "$env:LICENCA_URL" -NoNewline }
+          if ([string]::IsNullOrWhiteSpace((Get-Content app\licenca_url.txt -Raw))) { Write-Warning 'Sem URL de licenças: o app vai rodar sem pedir chave.' }
 
       - name: Montar instalador (Inno Setup)
         run: |

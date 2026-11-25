@@ -3,7 +3,7 @@
 // =====================================================================
 window.PDV_CONFIG = {
   // URL do App da Web do Apps Script (termina com /exec)
-  API_URL: 'COLE_AQUI_A_URL_DO_APPS_SCRIPT',
+  API_URL: 'https://script.google.com/macros/s/AKfycbwjxOifCzJJ7G4QDauglCMpRtj9E5rO6KYYPrKv3S9zLLd7R4ve3ovmG053kqLlFN5X9Q/exec',
 
   // Link do instalador (o GitHub atualiza sozinho a cada versão).
   // Pode ser trocado depois pela sua área restrita > Configurações.
