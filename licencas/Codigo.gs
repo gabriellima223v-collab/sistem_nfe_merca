@@ -13,8 +13,9 @@ const COLS = ['Chave', 'Cliente', 'Telefone', 'CNPJ', 'Status', 'Vencimento', 'M
 function configurarSenha() {
   PROPS.setProperty('ADMIN_SENHA', SENHA_INICIAL);
   if (!PROPS.getProperty('SEGREDO')) PROPS.setProperty('SEGREDO', Utilities.getUuid() + Utilities.getUuid());
-  aba_();
-  Logger.log('Senha configurada. Agora implante como App da Web.');
+  aba_(); abaAcessos_();
+  Logger.log('Senha configurada. Planilha das licenças: ' + planilha_().getUrl());
+  Logger.log('Agora clique em Implantar > Nova implantação > App da Web.');
 }
 
 // ---------------------------------------------------------------- roteamento
@@ -57,8 +58,19 @@ function rotear_(p) {
 }
 
 // ---------------------------------------------------------------- planilha
+// Funciona tanto colado dentro de uma planilha quanto como projeto avulso (cria a planilha sozinho)
+function planilha_() {
+  const ativa = SpreadsheetApp.getActiveSpreadsheet();
+  if (ativa) return ativa;
+  const id = PROPS.getProperty('PLANILHA_ID');
+  if (id) { try { return SpreadsheetApp.openById(id); } catch (e) {} }
+  const nova = SpreadsheetApp.create('PDV - Licenças');
+  PROPS.setProperty('PLANILHA_ID', nova.getId());
+  Logger.log('Planilha criada: ' + nova.getUrl());
+  return nova;
+}
 function aba_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = planilha_();
   let sh = ss.getSheetByName(ABA);
   if (!sh) {
     sh = ss.insertSheet(ABA);
@@ -105,7 +117,7 @@ function validar_(p, ativando) {
 
 // ---------------------------------------------------------------- registro de entradas (acessos)
 function abaAcessos_() {
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const ss = planilha_();
   let sh = ss.getSheetByName('Acessos');
   if (!sh) { sh = ss.insertSheet('Acessos'); sh.getRange(1, 1, 1, 6).setValues([['Data', 'Chave', 'Cliente', 'Evento', 'Usuario', 'Nome do PC']]).setFontWeight('bold').setBackground('#0f2a1d').setFontColor('#ffffff'); sh.setFrozenRows(1); }
   return sh;
