@@ -734,12 +734,82 @@ function editarProduto(p) {
   $('[data-k=preco]', m.el).oninput = mg; $('[data-k=custo]', m.el).oninput = mg; mg();
 }
 function importarPlanilha() {
-  modal({ titulo: 'Importar produtos (planilha CSV)', lg: true, corpo: `<p style="margin-top:0">Exporte o cadastro do sistema antigo (ou do Excel) como <b>CSV</b>. Colunas reconhecidas: <code>codigo, nome, preco, custo, estoque, ncm, unidade, cfop, csosn, cest, minimo, categoria</code>. Produtos com o mesmo código são atualizados.</p>
-    <input type="file" id="csvF" accept=".csv,.txt"><p class="ajuda">Ou cole o conteúdo:</p><textarea id="csvT" placeholder="codigo;nome;preco;custo;estoque;ncm&#10;7891000100103;Arroz 5kg;27,90;21,50;40;10063021"></textarea>`,
-    aoAbrir: f => { $('#csvF', f).onchange = async e => { $('#csvT', f).value = await lerArquivoTexto(e.target.files[0]); }; },
-    botoes: [{ txt: 'Importar', cls: 'pri', acao: async f => { const r = await api('produtos_importar', { csv: $('#csvT', f).value }); toast(`${r.novos} novos, ${r.atualizados} atualizados.`, 'ok'); telaProdutos(); } }] });
+  modal({ titulo: 'Importar produtos (Excel ou CSV)', lg: true, corpo: `<p style="margin-top:0">Escolha a planilha do sistema antigo: <b>Excel (.xlsx)</b> ou <b>CSV</b>. O sistema acha sozinho as colunas de código de barras, nome, preço, custo, estoque e NCM. Produto com o mesmo código é <b>atualizado</b>, não duplica.</p>
+    <label for="csvF" id="csvDrop" class="drop-imp">${ico('entrada', 34)}<b>Clique ou arraste a planilha aqui</b><span>.xlsx, .csv ou .txt</span></label><input type="file" id="csvF" accept=".xlsx,.xlsm,.csv,.txt,.xls" class="hide">
+    <div id="csvInfo" class="ajuda" style="margin:10px 0 6px"></div>
+    <p class="ajuda">Ou copie as linhas no Excel (com o título das colunas) e cole aqui:</p><textarea id="csvT" placeholder="codigo;nome;preco;custo;estoque;ncm&#10;7891000100103;Arroz 5kg;27,90;21,50;40;10063021"></textarea>`,
+    aoAbrir: f => {
+      const carregar = async arq => {
+        if (!arq) return;
+        const info = $('#csvInfo', f); info.textContent = 'Lendo ' + arq.name + '…';
+        try {
+          const nome = arq.name.toLowerCase();
+          if (/\.xls$/.test(nome)) throw new Error('Esse é o formato antigo do Excel (.xls). Abra no Excel e use Salvar como → "Pasta de Trabalho do Excel (.xlsx)".');
+          let texto;
+          if (/\.xls[xm]$/.test(nome)) { const pl = await lerXlsx(arq); texto = pl.linhas.map(l => l.map(celulaCSV).join(';')).join('\n'); info.innerHTML = `✓ <b>${esc(arq.name)}</b> · aba “${esc(pl.aba)}” · ${pl.linhas.length - 1} linhas`; }
+          else { texto = await lerArquivoTexto(arq); info.innerHTML = `✓ <b>${esc(arq.name)}</b> · ${texto.trim().split(/\r?\n/).length - 1} linhas`; }
+          $('#csvT', f).value = texto;
+        } catch (e) { info.textContent = ''; toast(e.message, 'er'); }
+      };
+      $('#csvF', f).onchange = e => carregar(e.target.files[0]);
+      const d = $('#csvDrop', f);
+      d.ondragover = e => { e.preventDefault(); d.classList.add('sobre'); }; d.ondragleave = () => d.classList.remove('sobre');
+      d.ondrop = e => { e.preventDefault(); d.classList.remove('sobre'); carregar(e.dataTransfer.files[0]); };
+    },
+    botoes: [{ txt: 'Importar', cls: 'pri', acao: async f => {
+      if (!$('#csvT', f).value.trim()) { toast('Escolha a planilha ou cole as linhas.', 'er'); return false; }
+      const r = await api('produtos_importar', { csv: $('#csvT', f).value });
+      toast(`${r.novos} novos, ${r.atualizados} atualizados.${r.colunas ? ' Colunas usadas: ' + r.colunas.join(', ') + '.' : ''}`, 'ok'); telaProdutos(); } }] });
 }
 async function lerArquivoTexto(f) { const b = await f.arrayBuffer(); let t = new TextDecoder('utf-8').decode(b); if (t.includes('�')) t = new TextDecoder('windows-1252').decode(b); return t; }
+const celulaCSV = v => { v = String(v ?? ''); return /[;"\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+
+// ---------- Leitor de Excel (.xlsx) sem biblioteca: o .xlsx é um zip com XMLs ----------
+async function lerXlsx(arq) {
+  const buf = new Uint8Array(await arq.arrayBuffer()), dv = new DataView(buf.buffer);
+  let fim = -1; for (let i = buf.length - 22; i >= Math.max(0, buf.length - 65600); i--) if (dv.getUint32(i, true) === 0x06054b50) { fim = i; break; }
+  if (fim < 0) throw new Error('Arquivo do Excel inválido ou corrompido.');
+  const n = dv.getUint16(fim + 10, true); let p = dv.getUint32(fim + 16, true); const arqs = {};
+  for (let k = 0; k < n; k++) {
+    const metodo = dv.getUint16(p + 10, true), tam = dv.getUint32(p + 20, true), ln = dv.getUint16(p + 28, true), le = dv.getUint16(p + 30, true), lc = dv.getUint16(p + 32, true), ini = dv.getUint32(p + 42, true);
+    arqs[new TextDecoder().decode(buf.subarray(p + 46, p + 46 + ln))] = { metodo, tam, ini }; p += 46 + ln + le + lc;
+  }
+  const ler = async nome => {
+    const e = arqs[nome]; if (!e) return null;
+    const dados = e.ini + 30 + dv.getUint16(e.ini + 26, true) + dv.getUint16(e.ini + 28, true), bruto = buf.subarray(dados, dados + e.tam);
+    if (e.metodo === 0) return new TextDecoder().decode(bruto);
+    if (e.metodo !== 8) throw new Error('Compactação do Excel não suportada. Salve como CSV.');
+    return await new Response(new Blob([bruto]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).text();
+  };
+  const xml = t => new DOMParser().parseFromString(t, 'application/xml');
+  const tags = (el, nome) => [...el.getElementsByTagName(nome)];
+  // textos compartilhados
+  const ss = await ler('xl/sharedStrings.xml'); const textos = ss ? tags(xml(ss), 'si').map(si => tags(si, 't').map(t => t.textContent).join('')) : [];
+  // primeira aba (na ordem do Excel)
+  const wb = xml(await ler('xl/workbook.xml') || ''), rels = xml(await ler('xl/_rels/workbook.xml.rels') || '');
+  const abas = tags(wb, 'sheet'); let alvo = 'xl/worksheets/sheet1.xml', nomeAba = abas[0]?.getAttribute('name') || 'Planilha1';
+  for (const a of abas) {
+    const rid = a.getAttribute('r:id') || a.getAttributeNS('http://schemas.openxmlformats.org/officeDocument/2006/relationships', 'id');
+    const rel = tags(rels, 'Relationship').find(r => r.getAttribute('Id') === rid);
+    if (rel) { const t = rel.getAttribute('Target').replace(/^\/?xl\//, '').replace(/^\//, ''); const cam = 'xl/' + t; if (arqs[cam]) { alvo = cam; nomeAba = a.getAttribute('name'); break; } }
+  }
+  const sh = await ler(alvo); if (!sh) throw new Error('Não achei a planilha dentro do arquivo.');
+  const col = r => { let c = 0; for (const ch of r.replace(/\d+/g, '')) c = c * 26 + ch.charCodeAt(0) - 64; return c - 1; };
+  const linhas = [];
+  for (const row of tags(xml(sh), 'row')) {
+    const l = [];
+    tags(row, 'c').forEach((c, i) => {
+      const t = c.getAttribute('t'), v = tags(c, 'v')[0]?.textContent ?? '';
+      let val = t === 's' ? (textos[+v] ?? '') : t === 'inlineStr' ? tags(c, 't').map(x => x.textContent).join('') : t === 'b' ? (v === '1' ? 'SIM' : 'NÃO') : v;
+      if ((!t || t === 'n') && /e/i.test(val) && isFinite(+val) && Number.isInteger(+val)) val = BigInt(Math.round(+val)).toString(); // código de barras em notação científica
+      else if ((!t || t === 'n') && val !== '' && isFinite(+val)) val = String(+(+val).toFixed(6));
+      l[c.getAttribute('r') ? col(c.getAttribute('r')) : i] = String(val).trim();
+    });
+    if (l.some(x => x)) linhas.push(Array.from(l, x => x ?? ''));
+  }
+  if (linhas.length < 2) throw new Error('A primeira aba da planilha está vazia.');
+  return { aba: nomeAba, linhas };
+}
 
 // ======================= ENTRADA DE NOTAS =======================
 async function telaEntrada() {

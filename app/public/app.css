@@ -204,3 +204,8 @@ tr.cl:hover td{background:#f7faf7;cursor:pointer}
 .lic-espera{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:700;color:var(--verde);margin:4px 0 14px}
 .lic-espera i{width:12px;height:12px;border-radius:50%;background:var(--verde);animation:pulsa 1.4s ease-in-out infinite}
 @keyframes pulsa{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}
+
+/* Importar planilha */
+.drop-imp{display:grid;place-items:center;gap:4px;border:2px dashed #b9c4bc;border-radius:16px;padding:26px;cursor:pointer;text-align:center;color:var(--mut)}
+.drop-imp b{color:var(--ink)}.drop-imp span{font-size:13px}
+.drop-imp.sobre,.drop-imp:hover{border-color:var(--verde);background:var(--verde-cl)}

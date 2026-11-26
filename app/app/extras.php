@@ -46,31 +46,59 @@ function buscarPorCodigo(string $cod): array {
 }
 
 function importarCSV(string $csv): array {
-  $linhas = preg_split('/\r?\n/', trim($csv)); if (count($linhas) < 2) throw new Exception('Planilha vazia.');
-  $sep = substr_count($linhas[0], ';') >= substr_count($linhas[0], ',') ? ';' : ',';
-  $cab = array_map(fn($h) => strtolower(trim(iconv('UTF-8', 'ASCII//TRANSLIT', $h) ?: $h)), str_getcsv($linhas[0], $sep));
-  $mapa = ['codigo' => ['codigo', 'cod', 'ean', 'codigo de barras', 'gtin', 'barras'], 'nome' => ['nome', 'descricao', 'produto'], 'preco' => ['preco', 'preco venda', 'venda', 'valor'],
-    'custo' => ['custo', 'preco custo'], 'estoque' => ['estoque', 'quantidade', 'qtd', 'saldo'], 'ncm' => ['ncm'], 'unidade' => ['unidade', 'un', 'und'], 'cest' => ['cest'],
-    'cfop' => ['cfop'], 'csosn' => ['csosn', 'cst'], 'minimo' => ['minimo', 'estoque minimo'], 'categoria' => ['categoria', 'grupo', 'secao']];
-  $idx = []; foreach ($mapa as $campo => $nomes) foreach ($cab as $i => $h) if (in_array($h, $nomes, true)) { $idx[$campo] = $i; break; }
-  if (!isset($idx['nome'])) throw new Exception('A planilha precisa ter uma coluna "nome" ou "descricao".');
+  $csv = preg_replace('/^\xEF\xBB\xBF/', '', $csv); // BOM do Excel
+  $linhas = array_values(array_filter(preg_split('/\r?\n/', trim($csv)), fn($l) => trim($l, " \t;,") !== ''));
+  if (count($linhas) < 2) throw new Exception('Planilha vazia.');
+  // separador: tab (colado do Excel), ponto e vírgula ou vírgula
+  $amostra = implode("\n", array_slice($linhas, 0, 5));
+  $cont = ["\t" => substr_count($amostra, "\t"), ';' => substr_count($amostra, ';'), ',' => substr_count($amostra, ',')];
+  arsort($cont); $sep = array_key_first($cont);
+  $norm = fn($h) => trim(preg_replace('/[^a-z0-9]+/', ' ', strtolower(iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', (string)$h) ?: (string)$h)));
+  // acha a linha do cabeçalho (relatórios costumam ter título nas primeiras linhas)
+  $ehNome = fn($h) => (bool)preg_match('/^(nome|descricao|produto|mercadoria|item)\b|\bdescricao\b/', $h);
+  $ini = 0;
+  foreach (array_slice($linhas, 0, 15, true) as $i => $l) { foreach (str_getcsv($l, $sep) as $h) if ($ehNome($norm($h))) { $ini = $i; break 2; } }
+  $cab = array_map($norm, str_getcsv($linhas[$ini], $sep));
+  // regras em ordem de prioridade: [campo, regex]
+  $regras = [
+    ['minimo', '/\b(estoque|qtd|quantidade) (minim|min)\b|^minimo$|^est min$/'],
+    ['codigo', '/\b(ean|gtin|barras?|cod barras?|codigo de barras|ean13)\b/'],
+    ['nome', '/^(nome|descricao|produto|mercadoria|item)\b|\bdescricao\b/'],
+    ['custo', '/\bcusto\b|preco de compra|preco compra|vlr compra/'],
+    ['preco', '/\b(preco|valor|vlr|pr)\b.*\bvenda\b|^venda$|^preco$|^valor$|^preco unit|^vlr unit|^p venda$/'],
+    ['estoque', '/\b(estoque|saldo|quantidade|qtd|qtde|quant)\b/'],
+    ['ncm', '/\bncm\b/'], ['cest', '/\bcest\b/'], ['cfop', '/\bcfop\b/'], ['csosn', '/\b(csosn|cst)\b/'],
+    ['unidade', '/^(un|und|unid|unidade|medida|unidade de medida)$/'],
+    ['categoria', '/\b(categoria|grupo|secao|departamento|familia)\b/'],
+    ['codigo_int', '/^(codigo|cod|cod produto|codigo produto|referencia|ref)$/'],
+  ];
+  $idx = [];
+  foreach ($regras as [$campo, $re]) foreach ($cab as $i => $h) if ($h !== '' && !in_array($i, $idx, true) && preg_match($re, $h)) { $idx[$campo] = $i; break; }
+  if (!isset($idx['codigo']) && isset($idx['codigo_int'])) $idx['codigo'] = $idx['codigo_int']; // sem coluna de barras: usa o código que tiver
+  if (!isset($idx['nome'])) throw new Exception('Não achei a coluna com o nome do produto. Deixe na primeira linha um título como "nome" ou "descricao".');
   $num = function ($v) { $v = preg_replace('/[^\d,.-]/', '', (string)$v); if (strpos($v, ',') !== false) $v = str_replace(',', '.', str_replace('.', '', $v)); return (float)$v; };
   $novos = 0; $atual = 0;
   db()->beginTransaction();
-  foreach (array_slice($linhas, 1) as $l) {
+  foreach (array_slice($linhas, $ini + 1) as $l) {
     if (!trim($l)) continue; $c = str_getcsv($l, $sep);
     $g = fn($k) => isset($idx[$k]) ? trim($c[$idx[$k]] ?? '') : null;
-    $d = ['nome' => $g('nome'), 'codigo' => $g('codigo'), 'unidade' => strtoupper($g('unidade') ?: 'UN'), 'ncm' => soDigitos($g('ncm')) ?: '00000000',
-      'cest' => soDigitos($g('cest')), 'cfop' => soDigitos($g('cfop')) ?: '5102', 'csosn' => soDigitos($g('csosn')) ?: '102', 'categoria' => $g('categoria')];
-    foreach (['preco', 'custo', 'estoque', 'minimo'] as $k) $d[$k] = $g($k) !== null ? $num($g($k)) : 0;
-    if (!$d['nome']) continue;
-    $id = $d['codigo'] ? qv('SELECT id FROM produtos WHERE codigo=? AND ativo=1', [$d['codigo']]) : null;
-    if ($id) { ex('UPDATE produtos SET nome=?,preco=?,custo=?,estoque=?,ncm=?,unidade=?,atualizado=? WHERE id=?', [$d['nome'], $d['preco'], $d['custo'], $d['estoque'], $d['ncm'], $d['unidade'], agora(), $id]); $atual++; }
+    $cod = $g('codigo'); if ($cod !== null && preg_match('/^\d+([.,]0+)?$/', $cod)) $cod = preg_replace('/[.,]0+$/', '', $cod);
+    $d = ['nome' => $g('nome'), 'codigo' => $cod, 'unidade' => strtoupper($g('unidade') ?: 'UN'), 'ncm' => ($n = soDigitos($g('ncm'))) ? str_pad($n, 8, '0', STR_PAD_LEFT) : '00000000',
+      'cest' => ($ce = soDigitos($g('cest'))) ? str_pad($ce, 7, '0', STR_PAD_LEFT) : '', 'cfop' => soDigitos($g('cfop')) ?: '5102', 'csosn' => soDigitos($g('csosn')) ?: '102', 'categoria' => $g('categoria')];
+    foreach (['preco', 'custo', 'estoque', 'minimo'] as $k) $d[$k] = $g($k) !== null && $g($k) !== '' ? $num($g($k)) : 0;
+    if (!$d['nome'] || preg_match('/^total\b/i', $d['nome'])) continue;
+    $id = $d['codigo'] ? qv('SELECT id FROM produtos WHERE codigo=? AND ativo=1', [$d['codigo']]) : qv('SELECT id FROM produtos WHERE nome=? AND ativo=1', [$d['nome']]);
+    if ($id) { // atualiza só as colunas que vieram na planilha
+      $set = ['nome=?']; $par = [$d['nome']];
+      foreach (['preco', 'custo', 'estoque', 'minimo', 'ncm', 'unidade', 'cest', 'cfop', 'csosn', 'categoria'] as $k) if (isset($idx[$k]) && $g($k) !== '') { $set[] = "$k=?"; $par[] = $d[$k]; }
+      $par[] = agora(); $par[] = $id;
+      ex('UPDATE produtos SET ' . implode(',', $set) . ',atualizado=? WHERE id=?', $par); $atual++; }
     else { ex('INSERT INTO produtos (codigo,nome,unidade,preco,custo,estoque,minimo,ncm,cest,cfop,csosn,categoria,atualizado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)',
       [$d['codigo'], $d['nome'], $d['unidade'], $d['preco'], $d['custo'], $d['estoque'], $d['minimo'], $d['ncm'], $d['cest'], $d['cfop'], $d['csosn'], $d['categoria'], agora()]); $novos++; }
   }
   db()->commit();
-  return ['novos' => $novos, 'atualizados' => $atual];
+  $nomes = ['codigo' => 'código', 'nome' => 'nome', 'preco' => 'preço', 'custo' => 'custo', 'estoque' => 'estoque', 'ncm' => 'NCM', 'unidade' => 'unidade', 'minimo' => 'mínimo', 'categoria' => 'categoria', 'cest' => 'CEST', 'cfop' => 'CFOP', 'csosn' => 'CSOSN'];
+  return ['novos' => $novos, 'atualizados' => $atual, 'colunas' => array_values(array_intersect_key($nomes, $idx))];
 }
 
 // ---------- Entrada por XML da NF-e do fornecedor ----------

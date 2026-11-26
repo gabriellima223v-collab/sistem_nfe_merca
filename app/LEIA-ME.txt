@@ -94,7 +94,10 @@ do Windows. O sistema imprime direto, sem abrir janela de impressão.
    WhatsApp.
  • Painel do dono: faturamento, lucro, margem, curva ABC, horários de
    movimento, produtos parados.
- • Importação do cadastro do sistema antigo por planilha CSV.
+ • Importação do cadastro e do estoque do sistema antigo por planilha
+   Excel (.xlsx) ou CSV: Produtos e estoque > Importar planilha. As
+   colunas (código de barras, nome, preço, custo, estoque, NCM...) são
+   reconhecidas sozinhas; produto com o mesmo código é atualizado.
  • Usuários com senha (gerente e caixa). Desconto, sangria e
    cancelamento pedem a senha do gerente.
 
