@@ -61,8 +61,9 @@ try {
     if (cfg('configurado') === '1') gerente();
     $perm = ['emp_cnpj','emp_razao','emp_fantasia','emp_ie','emp_crt','emp_logradouro','emp_numero','emp_complemento','emp_bairro','emp_cmun','emp_municipio','emp_uf','emp_cep','emp_fone',
       'csc','csc_id','ambiente','nfce_serie','nfce_numero','maquininha','mp_token','mp_terminal','balanca_cod_ini','balanca_cod_len','balanca_val_ini','balanca_val_len','balanca_tipo',
-      'resp_cnpj','resp_nome','resp_email','resp_fone','whats_dono','impressao_auto','cnpj_credenciadora','configurado','msg_cupom'];
+      'resp_cnpj','resp_nome','resp_email','resp_fone','stone_sk','stone_parceiro','stone_serial','whats_dono','impressao_auto','cnpj_credenciadora','configurado','msg_cupom'];
     $vals = array_intersect_key($in, array_flip($perm));
+    if (isset($vals['stone_sk'])) { if (str_contains($vals['stone_sk'], '•')) unset($vals['stone_sk']); else $vals['stone_sk'] = segredo(trim($vals['stone_sk']), true); }
     if (isset($vals['mp_token'])) { if (str_contains($vals['mp_token'], '•')) unset($vals['mp_token']); else $vals['mp_token'] = segredo(trim($vals['mp_token']), true); }
     if (isset($vals['ambiente']) && $vals['ambiente'] === 'producao' && !file_exists(DADOS . '/certificado/certificado.pfx')) erro('Para produção, envie o certificado A1 primeiro.');
     cfgSet($vals); ok(['config' => configPublica()]);
@@ -187,6 +188,11 @@ try {
   case 'mp_status': usuario(); ok(mpStatus((string)$in['id']));
   case 'mp_cancelar': usuario(); ok(mpCancelar((string)$in['id']));
 
+  // ---------------- Maquininha Stone (Stone Connect) ----------------
+  case 'stone_cobrar': usuario(); ok(stoneCobrar((float)$in['valor'], (string)$in['tipo'], (string)($in['ref'] ?? '')));
+  case 'stone_status': usuario(); ok(stoneStatus((string)$in['id']));
+  case 'stone_cancelar': usuario(); ok(stoneCancelar((string)$in['id']));
+
   // ---------------- Conciliação e relatórios ----------------
   case 'conciliar': gerente(); ok(conciliar((string)$in['csv'], (int)($in['janela'] ?? 10)));
   case 'painel': usuario(); ok(painel((string)($in['de'] ?? date('Y-m-01')), (string)($in['ate'] ?? date('Y-m-d'))));
@@ -202,7 +208,7 @@ try {
 
 function configPublica(): array {
   $c = []; foreach (q('SELECT k,v FROM config') as $r) $c[$r['k']] = $r['v'];
-  unset($c['cert_senha']); $c['mp_token'] = !empty($c['mp_token']) ? '••••••••' : '';
+  unset($c['cert_senha']); $c['mp_token'] = !empty($c['mp_token']) ? '••••••••' : ''; $c['stone_sk'] = !empty($c['stone_sk']) ? '••••••••' : '';
   $c['cert_ok'] = file_exists(DADOS . '/certificado/certificado.pfx');
   return $c;
 }

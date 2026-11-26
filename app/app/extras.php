@@ -332,3 +332,63 @@ function alertas(): array {
     'contingencia' => (int)qv("SELECT COUNT(*) FROM vendas WHERE status='ok' AND nfce_status='contingencia'"),
     'rejeitadas' => (int)qv("SELECT COUNT(*) FROM vendas WHERE status='ok' AND nfce_status='rejeitada'")];
 }
+
+// ---------- Stone Connect (Pagar.me) ----------
+// Cobrança enviada direto para a maquininha Stone. O resultado chega por webhook no Apps Script
+// (servidor de licenças) e o PDV consulta lá; a consulta direta à Stone fica só de reserva.
+function stone(string $metodo, string $path, $corpo = null): array {
+  $sk = segredo((string)cfg('stone_sk', ''), false);
+  if (!$sk) throw new Exception('Configure a Secret Key da Stone em Configurações.');
+  $h = ['Authorization: Basic ' . base64_encode($sk . ':')];
+  if (cfg('stone_parceiro')) $h[] = 'ServiceRefererName: ' . cfg('stone_parceiro');
+  [$c, $d] = http($metodo, 'https://api.pagar.me/core/v5' . $path, $corpo, $h);
+  if ($c >= 400) throw new Exception('Stone: ' . ($d['message'] ?? (isset($d['errors']) ? json_encode($d['errors'], JSON_UNESCAPED_UNICODE) : "erro $c")));
+  return $d ?: [];
+}
+function stoneCobrar(float $valor, string $tipo, string $ref): array {
+  $serial = trim((string)cfg('stone_serial', '')); if (!$serial) throw new Exception('Informe o número de série da maquininha Stone em Configurações.');
+  $tipos = ['credito' => 'credit', 'debito' => 'debit', 'pix' => 'pix'];
+  $setup = ['type' => $tipos[$tipo] ?? 'credit'];
+  if (in_array($setup['type'], ['credit', 'pix'], true)) { $setup['installments'] = 1; $setup['installment_type'] = 'merchant'; }
+  $d = stone('POST', '/orders/', [
+    'code' => $ref ?: 'pdv-' . time(),
+    'customer' => ['name' => cfg('emp_fantasia', 'Consumidor'), 'email' => 'consumidor@pdv.local'],
+    'items' => [['amount' => (int)round($valor * 100), 'description' => 'Venda PDV', 'quantity' => 1, 'code' => 'VENDA']],
+    'closed' => false,
+    'poi_payment_settings' => ['visible' => true, 'display_name' => 'Caixa', 'print_order_receipt' => false,
+      'devices_serial_number' => [$serial], 'payment_setup' => $setup],
+  ]);
+  return ['id' => $d['id'] ?? '', 'status' => $d['status'] ?? ''];
+}
+function stoneLerPedido(array $o): array {
+  $ch = $o['charges'][0] ?? []; $tx = $ch['last_transaction'] ?? [];
+  $st = strtolower((string)($o['status'] ?? ''));
+  $chst = strtolower((string)($ch['status'] ?? ''));
+  return ['status' => $st ?: $chst, 'aprovado' => $st === 'paid' || $chst === 'paid',
+    'falhou' => in_array($st, ['canceled', 'failed'], true) || in_array($chst, ['failed', 'canceled', 'not_authorized'], true),
+    'bandeira' => strtolower((string)($tx['card']['brand'] ?? ($tx['brand'] ?? ''))),
+    'autorizacao' => (string)($tx['acquirer_auth_code'] ?? ''), 'nsu' => (string)($tx['acquirer_nsu'] ?? ($tx['id'] ?? ''))];
+}
+function stoneStatus(string $id): array {
+  // 1º: aviso que a Stone mandou para o Apps Script (webhook)
+  if (licUrl() !== '') {
+    try {
+      $ch = curl_init(licUrl());
+      curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_FOLLOWLOCATION => true, CURLOPT_TIMEOUT => 6, CURLOPT_POST => true,
+        CURLOPT_HTTPHEADER => ['Content-Type: text/plain'], CURLOPT_POSTFIELDS => json_encode(['acao' => 'stone_status', 'pedido' => $id])]);
+      $r = json_decode((string)curl_exec($ch), true); curl_close($ch);
+      if (!empty($r['pedido'])) {
+        $res = stoneLerPedido($r['pedido']);
+        // aprovado pelo aviso: confirma uma vez direto na Stone antes de fechar a venda (ninguém consegue forjar um "pago")
+        if ($res['aprovado']) { $conf = stoneLerPedido(stone('GET', '/orders/' . rawurlencode($id))); return $conf['aprovado'] ? array_merge($res, array_filter($conf)) : $conf; }
+        return $res;
+      }
+    } catch (Throwable $e) {}
+  }
+  // 2º (reserva): consulta direta, no máximo a cada 8 segundos por pedido
+  $k = DADOS . '/.stone_' . preg_replace('/\W/', '', $id);
+  if (file_exists($k) && time() - filemtime($k) < 8) return ['status' => 'pending', 'aprovado' => false, 'falhou' => false];
+  touch($k);
+  return stoneLerPedido(stone('GET', '/orders/' . rawurlencode($id)));
+}
+function stoneCancelar(string $id): array { stone('PATCH', '/orders/' . rawurlencode($id) . '/closed/', ['status' => 'canceled']); return ['cancelado' => true]; }

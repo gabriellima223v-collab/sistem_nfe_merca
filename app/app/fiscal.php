@@ -45,7 +45,7 @@ function certificadoInfo(string $pfx, string $senha): array {
 }
 
 function tools(): Tools {
-  if (!bibliotecaInstalada()) throw new Exception('Biblioteca fiscal não instalada. Gere o instalador de novo com o gerar-instalador.bat (veja o LEIA-ME).');
+  if (!bibliotecaInstalada()) throw new Exception('Biblioteca fiscal não instalada. Reinstale o PDV pelo botão Baixe aqui do site.');
   $pfxPath = DADOS . '/certificado/certificado.pfx';
   if (!file_exists($pfxPath)) throw new Exception('Certificado A1 não configurado.');
   $conf = [

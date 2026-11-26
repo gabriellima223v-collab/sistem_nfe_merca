@@ -236,7 +236,9 @@ function assistente(passo = 1, dados = {}) {
   if (passo === 4) corpo = `<h2>Maquininha de cartão</h2>
     <div class="campo"><label>Como você recebe cartão?</label><select data-k="maquininha" id="wMaq">
       <option value="manual">Maquininha separada (o caixa digita o valor e confirma no sistema)</option>
+      <option value="stone">Stone integrada (o valor vai sozinho para a maquininha)</option>
       <option value="mp">Mercado Pago Point integrada (o valor vai sozinho para a maquininha)</option></select></div>
+    <div id="wSt" class="${c.maquininha === 'stone' ? '' : 'hide'}">${campo('stone_sk', 'Secret Key da loja (Stone / Pagar.me)', 'password')}${campo('stone_parceiro', 'Seu ID de parceiro Stone')}${campo('stone_serial', 'Número de série da maquininha')}</div>
     <div id="wMp" class="${c.maquininha === 'mp' ? '' : 'hide'}">${campo('mp_token', 'Access Token do Mercado Pago (produção)', 'password')}
       <p class="ajuda">No site mercadopago.com.br/developers → Suas integrações → Criar aplicação → Credenciais de produção. Depois você escolhe a maquininha em Configurações.</p></div>
     <p class="ajuda">A senha inicial do gerente é <b>1234</b>. Troque em Configurações → Usuários depois de entrar.</p>`;
@@ -265,14 +267,14 @@ function assistente(passo = 1, dados = {}) {
       let h = ck(!!(c.emp_cnpj && c.emp_razao && c.emp_ie && c.emp_cmun), 'Dados da empresa', c.emp_cmun ? '' : 'Falta o código IBGE da cidade (use Buscar no passo anterior).');
       h += ck(!!c.cert_validade, 'Certificado A1', c.cert_validade ? 'Válido até ' + c.cert_validade.split('-').reverse().join('/') : 'Envie o certificado no passo anterior.');
       h += ck(!!(c.csc && c.csc_id), 'CSC configurado');
-      h += ck(!!S.est.biblioteca, 'Biblioteca fiscal (sped-nfe)', S.est.biblioteca ? 'Instalada' : 'Gere o instalador com o gerar-instalador.bat (veja o LEIA-ME).');
+      h += ck(!!S.est.biblioteca, 'Biblioteca fiscal (sped-nfe)', S.est.biblioteca ? 'Instalada' : 'Reinstale o PDV pelo site.');
       $('#wChecks').innerHTML = h + ck(null, 'Conexão com a SEFAZ', 'Testando…');
       try { const r = await api('sefaz_status'); $('#wChecks').lastElementChild.outerHTML = ck(r.ok, 'Conexão com a SEFAZ', r.msg); }
       catch (e) { $('#wChecks').lastElementChild.outerHTML = ck(false, 'Conexão com a SEFAZ', e.message); }
     };
     $('#wRetestar').onclick = testar; testar();
   }
-  if (passo === 4) $('#wMaq').onchange = e => $('#wMp').classList.toggle('hide', e.target.value !== 'mp');
+  if (passo === 4) $('#wMaq').onchange = e => { $('#wMp').classList.toggle('hide', e.target.value !== 'mp'); $('#wSt').classList.toggle('hide', e.target.value !== 'stone'); };
   $('#wProx').onclick = async () => {
     coletar();
     if (passo === 1 && (!dados.emp_cnpj || !dados.emp_razao || !dados.emp_uf)) return toast('Preencha CNPJ, razão social e UF.', 'er');
@@ -487,7 +489,7 @@ function pagamento() {
 }
 // Maquininha: integrada (Mercado Pago) ou separada (manual)
 function cobrarMaquininha(forma, valor) {
-  const tipo = S.cfg.maquininha === 'mp' ? 'mp' : 'manual';
+  const tipo = ['mp', 'stone'].includes(S.cfg.maquininha) ? S.cfg.maquininha : 'manual';
   return new Promise(res => {
     let fim = false; const fecha = (r, m) => { if (fim) return; fim = true; m.fechar(); res(r); };
     if (tipo === 'manual' || (tipo === 'mp' && forma === 'pix')) {
@@ -496,12 +498,12 @@ function cobrarMaquininha(forma, valor) {
       new MutationObserver((_, o) => { if (!m.el.isConnected) { o.disconnect(); if (!fim) { fim = true; res(null); } } }).observe($('#modais'), { childList: true }); return;
     }
     const m = modal({ titulo: 'Maquininha', fechavel: false, corpo: `<div class="maq"><div class="anel"></div><h2 style="margin:0 0 4px">${R(valor)} · ${FORMAS[forma]}</h2><p id="mqMsg" style="font-size:17px">${forma === 'pix' ? 'Mostrando QR Code do PIX…' : 'Valor enviado. Peça para o cliente aproximar ou inserir o cartão.'}</p></div>`,
-      botoes: [{ txt: 'Cancelar cobrança', acao: async () => { if (tipo === 'mp' && m.id) await api('mp_cancelar', { id: m.id }).catch(() => {}); fecha(null, m); return false; } }] });
-    api('mp_cobrar', { valor, tipo: forma, ref: 'pdv-' + Date.now() }).then(r => {
+      botoes: [{ txt: 'Cancelar cobrança', acao: async () => { if (m.id) await api(tipo + '_cancelar', { id: m.id }).catch(() => {}); fecha(null, m); return false; } }] });
+    api(tipo + '_cobrar', { valor, tipo: forma, ref: 'pdv-' + Date.now() }).then(r => {
       m.id = r.id; const t0 = Date.now();
       const poll = async () => {
         if (fim) return;
-        try { const s = await api('mp_status', { id: r.id });
+        try { const s = await api(tipo + '_status', { id: r.id });
           if (s.aprovado) return fecha({ integrado: 1, bandeira: s.bandeira, autorizacao: s.autorizacao, nsu: s.nsu }, m);
           if (s.falhou) { $('#mqMsg', m.el).textContent = 'Pagamento não aprovado (' + s.status + ').'; setTimeout(() => fecha(null, m), 2500); return; }
         } catch (e) {}
@@ -758,11 +760,14 @@ async function telaConfig() {
       <div class="card" style="box-shadow:none;border:1px solid var(--linha);padding:12px;margin-bottom:12px"><b>Certificado A1</b> ${c.cert_validade ? `<span class="pill ${new Date(c.cert_validade) - Date.now() < 30 * 864e5 ? 'p-er' : 'p-ok'}"><i></i>válido até ${c.cert_validade.split('-').reverse().join('/')}</span>` : '<span class="pill p-av"><i></i>não enviado</span>'}
         <div class="linha" style="margin-top:8px"><input type="file" id="cfc" accept=".pfx,.p12" style="flex:1"><input type="password" id="cfs" placeholder="Senha" style="width:140px"><button class="btn" id="cfe">Enviar</button></div></div>
       <div class="linha"><button class="btn" id="tsf">Testar conexão com a SEFAZ</button><span id="tsr" class="ajuda"></span></div>
-      ${est.biblioteca ? '' : '<p class="p-av" style="padding:10px;border-radius:10px;margin-top:10px">Biblioteca fiscal ainda não instalada: gere o instalador com o <b>gerar-instalador.bat</b> antes de usar homologação/produção.</p>'}</div>
-    <div class="card"><h2>Maquininha</h2>${sel('maquininha', 'Tipo', [['manual', 'Separada (caixa digita e confirma)'], ['mp', 'Mercado Pago Point integrada']])}
+      ${est.biblioteca ? '' : '<p class="p-av" style="padding:10px;border-radius:10px;margin-top:10px">Biblioteca fiscal não encontrada: reinstale o PDV pelo botão <b>Baixe aqui</b> do site.</p>'}</div>
+    <div class="card"><h2>Maquininha</h2>${sel('maquininha', 'Tipo', [['manual', 'Separada (caixa digita e confirma)'], ['stone', 'Stone integrada (Stone Connect)'], ['mp', 'Mercado Pago Point integrada']])}
+      <details ${c.maquininha === 'stone' ? 'open' : ''}><summary style="cursor:pointer;font-weight:700;margin:4px 0 10px">Stone</summary>${f('stone_sk', 'Secret Key da loja (Partner Hub ou Pagar.me > Desenvolvimento > Chaves)', 'password')}${f('stone_parceiro', 'Seu ID de parceiro Stone (ServiceRefererName)')}${f('stone_serial', 'Número de série da maquininha (etiqueta atrás)')}
+      <p class="ajuda">No painel Pagar.me, cadastre o webhook apontando para a URL do seu servidor de licenças (Apps Script), eventos de pedido e cobrança.</p></details>
+      <details ${c.maquininha === 'mp' ? 'open' : ''}><summary style="cursor:pointer;font-weight:700;margin:4px 0 10px">Mercado Pago</summary>
       ${f('cnpj_credenciadora', 'CNPJ da credenciadora (opcional, vai na NFC-e)')}${f('mp_token', 'Access Token Mercado Pago', 'password')}
       <div class="linha"><select data-k="mp_terminal" id="mpt" style="flex:1"><option value="${esc(c.mp_terminal || '')}">${esc(c.mp_terminal || 'Nenhuma maquininha escolhida')}</option></select><button class="btn" id="mpb">Buscar maquininhas</button></div>
-      <p class="ajuda">A maquininha precisa estar no modo PDV (no app do Mercado Pago).</p></div>
+      <p class="ajuda">A maquininha precisa estar no modo PDV (no app do Mercado Pago).</p></details></div>
     <div class="card"><h2>Caixa e balança</h2>${sel('impressao_auto', 'Imprimir cupom automaticamente', [['0', 'Não (pergunta)'], ['1', 'Sim']])}${f('msg_cupom', 'Mensagem no fim do cupom')}${f('whats_dono', 'WhatsApp do dono (resumos e lista de compras)', 'text', 'placeholder="11999998888"')}
       ${sel('balanca_tipo', 'Etiqueta da balança traz', [['preco', 'Preço total'], ['peso', 'Peso (gramas)']])}<div class="grid g4">${f('balanca_cod_ini', 'Código: posição', 'number', 'placeholder="2"')}${f('balanca_cod_len', 'Código: dígitos', 'number', 'placeholder="4"')}${f('balanca_val_ini', 'Valor: posição', 'number', 'placeholder="8"')}${f('balanca_val_len', 'Valor: dígitos', 'number', 'placeholder="5"')}</div></div>
     <div class="card"><h2>Usuários</h2><table><tbody>${u.lista.map(x => `<tr><td><b>${esc(x.nome)}</b></td><td>${x.perfil === 'gerente' ? 'Gerente' : 'Caixa'}</td><td>${x.ativo == 1 ? '' : '<span class="chip p-er">inativo</span>'}</td><td class="r"><button class="btn sm" data-u="${x.id}">Editar</button></td></tr>`).join('')}</tbody></table><button class="btn" id="nu" style="margin-top:10px">+ Novo usuário</button></div>

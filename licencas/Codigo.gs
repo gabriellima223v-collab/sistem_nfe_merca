@@ -23,6 +23,7 @@ function doGet(e) { return saida_(rotear_((e && e.parameter) || {})); }
 function doPost(e) {
   let d = {};
   try { d = JSON.parse((e.postData && e.postData.contents) || '{}'); } catch (x) {}
+  if (!d.acao && d.type && d.data) return saida_(webhookStone_(d)); // aviso da Stone/Pagar.me
   return saida_(rotear_(Object.assign({}, (e && e.parameter) || {}, d)));
 }
 function saida_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
@@ -36,6 +37,7 @@ function rotear_(p) {
       case 'verificar': return validar_(p, false);
       case 'admin_login': return login_(p.senha);
       case 'evento': return evento_(p);
+      case 'stone_status': { const c = CacheService.getScriptCache().get('st_' + String(p.pedido || '')); return { ok: true, pedido: c ? JSON.parse(c) : null }; }
       // administrador
       case 'admin_listar': adm_(p); return { ok: true, lista: listar_() };
       case 'admin_salvar': adm_(p); return salvar_(p.dados || {});
@@ -113,6 +115,20 @@ function validar_(p, ativando) {
     gravar_(l._linha, campos);
     return { ok: true, status: 'ativa', cliente: l.Cliente, contato: contato };
   } finally { trava.releaseLock(); }
+}
+
+// ---------------------------------------------------------------- maquininha Stone (webhook)
+// No painel Pagar.me, cadastre o webhook com a URL deste App da Web (eventos order.* e charge.*).
+// O PDV pergunta aqui se a cobrança foi paga e confirma direto na Stone antes de fechar a venda.
+function webhookStone_(w) {
+  const d = w.data || {};
+  let pedido;
+  if (String(w.type).indexOf('order.') === 0) pedido = d;
+  else { const id = (d.order && d.order.id) || d.order_id; if (!id) return { ok: true }; pedido = { id: id, status: d.status === 'paid' ? 'paid' : (d.status || ''), charges: [d] }; }
+  if (!pedido || !pedido.id) return { ok: true };
+  const enxuto = { id: pedido.id, status: pedido.status, charges: (pedido.charges || []).slice(0, 1).map(c => ({ status: c.status, last_transaction: c.last_transaction ? { card: c.last_transaction.card ? { brand: c.last_transaction.card.brand } : null, acquirer_auth_code: c.last_transaction.acquirer_auth_code, acquirer_nsu: c.last_transaction.acquirer_nsu, id: c.last_transaction.id } : null })) };
+  CacheService.getScriptCache().put('st_' + pedido.id, JSON.stringify(enxuto), 21600);
+  return { ok: true };
 }
 
 // ---------------------------------------------------------------- registro de entradas (acessos)
