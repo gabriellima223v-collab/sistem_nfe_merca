@@ -1,7 +1,6 @@
 <?php
 // ============================================================
 //  Módulo fiscal - NFC-e (modelo 65)
-//  Modo "demo": simula a SEFAZ (para apresentar o sistema)
 //  Modo "homologacao"/"producao": usa a biblioteca gratuita sped-nfe (NFePHP)
 // ============================================================
 use NFePHP\Common\Certificate;
@@ -14,7 +13,7 @@ const CUF = ['RO'=>11,'AC'=>12,'AM'=>13,'RR'=>14,'PA'=>15,'AP'=>16,'TO'=>17,'MA'
 // Códigos de pagamento da NFC-e (tPag)
 const TPAG = ['dinheiro'=>'01','credito'=>'03','debito'=>'04','fiado'=>'05','pix'=>'17','outros'=>'99'];
 
-function ambiente(): string { return cfg('ambiente', 'demo'); } // demo | homologacao | producao
+function ambiente(): string { $a = cfg('ambiente', 'homologacao'); return $a === 'producao' ? 'producao' : 'homologacao'; } // homologacao | producao
 function soDigitos($s): string { return preg_replace('/\D/', '', (string)$s); }
 function n2($v): string { return number_format((float)$v, 2, '.', ''); }
 function n4($v): string { return number_format((float)$v, 4, '.', ''); }
@@ -87,7 +86,6 @@ function segredo(string $v, bool $cifrar): string {
 }
 
 function sefazStatus(): array {
-  if (ambiente() === 'demo') return ['ok' => true, 'msg' => 'Modo demonstração: SEFAZ simulada respondendo normalmente.'];
   $std = (new Standardize(tools()->sefazStatus()))->toStd();
   return ['ok' => (int)$std->cStat === 107, 'msg' => "{$std->cStat} - {$std->xMotivo}"];
 }
@@ -107,7 +105,7 @@ function consumirNumero(int $n): void { cfgSet(['nfce_numero' => $n + 1]); }
 function emitirNFCe(array $v, array $itens, array $pags, bool $forcarContingencia = false): array {
   $numero = proximoNumero();
   $serie = (int)cfg('nfce_serie', 1);
-  if (ambiente() === 'demo') return emitirDemo($v, $itens, $pags, $numero, $serie);
+  if (!bibliotecaInstalada()) return ['nfce_status' => 'rejeitada', 'motivo' => 'Biblioteca fiscal não encontrada. Reinstale o PDV com o instalador mais novo do site.'];
 
   $tpEmis = $forcarContingencia ? 9 : 1;
   try {
@@ -158,7 +156,6 @@ function salvarContingencia(string $assinado, int $numero, int $serie): array {
 
 // Transmite notas emitidas em contingência (chamado automaticamente pelo PDV a cada minuto)
 function transmitirContingencias(): array {
-  if (ambiente() === 'demo') return ['enviadas' => 0, 'pendentes' => 0];
   $pend = q("SELECT * FROM vendas WHERE nfce_status='contingencia' AND status='ok'");
   if (!$pend) return ['enviadas' => 0, 'pendentes' => 0];
   $t = tools(); $ok = 0;
@@ -258,21 +255,6 @@ function montarXML(array $v, array $itens, array $pags, int $numero, int $serie,
 function codBandeira(string $b): string {
   $m = ['visa' => '01', 'master' => '02', 'mastercard' => '02', 'amex' => '03', 'sorocred' => '04', 'diners' => '05', 'elo' => '06', 'hipercard' => '07', 'aura' => '08', 'cabal' => '09'];
   return $m[strtolower($b)] ?? '99';
-}
-
-function emitirDemo(array $v, array $itens, array $pags, int $numero, int $serie): array {
-  $uf = cfg('emp_uf', 'SP');
-  $c43 = CUF[$uf] . date('ym') . str_pad(soDigitos(cfg('emp_cnpj', '00000000000000')), 14, '0', STR_PAD_LEFT) . '65' .
-         str_pad((string)$serie, 3, '0', STR_PAD_LEFT) . str_pad((string)$numero, 9, '0', STR_PAD_LEFT) . '1' . str_pad((string)mt_rand(1, 99999999), 8, '0', STR_PAD_LEFT);
-  $chave = $c43 . digitoChave($c43);
-  $prot = '1' . CUF[$uf] . date('y') . str_pad((string)mt_rand(0, 9999999999), 10, '0', STR_PAD_LEFT);
-  $url = 'https://www.sefaz.' . strtolower($uf) . '.gov.br/nfce/consulta';
-  $qr = $url . '?p=' . $chave . '|3|2';
-  $xml = '<?xml version="1.0" encoding="UTF-8"?><nfeProc versao="4.00"><!-- SIMULACAO - SEM VALOR FISCAL --><NFe><infNFe Id="NFe' . $chave . '"><ide><mod>65</mod><serie>' . $serie . '</serie><nNF>' . $numero . '</nNF><dhEmi>' . date('c') . '</dhEmi></ide><total><vNF>' . n2($v['total']) . '</vNF></total></infNFe></NFe><protNFe><infProt><chNFe>' . $chave . '</chNFe><nProt>' . $prot . '</nProt><cStat>100</cStat></infProt></protNFe></nfeProc>';
-  $path = salvarXML($xml, $chave);
-  consumirNumero($numero);
-  return ['nfce_status' => 'demo', 'chave' => $chave, 'numero' => $numero, 'serie' => $serie, 'protocolo' => $prot, 'qrcode' => $qr, 'url_chave' => $url,
-          'xml_path' => $path, 'tpemis' => 1, 'motivo' => 'Simulação (modo demonstração) - sem valor fiscal'];
 }
 
 function cancelarNFCe(array $v, string $just): array {

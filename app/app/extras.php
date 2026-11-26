@@ -1,7 +1,7 @@
 <?php
 // ============================================================
 //  Regras de negócio: vendas, caixa, estoque, fiado, entrada de XML,
-//  maquininha Mercado Pago, conciliação, painel e dados de demonstração
+//  maquininha Mercado Pago, conciliação e painel
 // ============================================================
 
 // ---------- Consulta de CNPJ (BrasilAPI - gratuita) ----------
@@ -331,76 +331,4 @@ function alertas(): array {
   return ['estoque_baixo' => $baixo, 'validade' => $val, 'cert_dias' => $diasCert,
     'contingencia' => (int)qv("SELECT COUNT(*) FROM vendas WHERE status='ok' AND nfce_status='contingencia'"),
     'rejeitadas' => (int)qv("SELECT COUNT(*) FROM vendas WHERE status='ok' AND nfce_status='rejeitada'")];
-}
-
-// ---------- Dados de demonstração ----------
-function ean13(string $base12): string { $s = 0; for ($i = 0; $i < 12; $i++) $s += (int)$base12[$i] * ($i % 2 ? 3 : 1); return $base12 . ((10 - $s % 10) % 10); }
-function carregarDemo(): void {
-  cfgSet(['emp_cnpj' => '11222333000181', 'emp_razao' => 'MERCADINHO BOM PRECO LTDA', 'emp_fantasia' => 'Mercadinho Bom Preço', 'emp_ie' => '123456789110', 'emp_crt' => '1',
-    'emp_logradouro' => 'Rua das Flores', 'emp_numero' => '120', 'emp_bairro' => 'Centro', 'emp_cmun' => '3550308', 'emp_municipio' => 'São Paulo', 'emp_uf' => 'SP',
-    'emp_cep' => '01001000', 'emp_fone' => '11999990000', 'ambiente' => 'demo', 'nfce_serie' => '2', 'nfce_numero' => '1', 'maquininha' => 'demo', 'configurado' => '1',
-    'cnpj_credenciadora' => '', 'msg_cupom' => 'Obrigado pela preferência! Volte sempre.']);
-  if ((int)qv('SELECT COUNT(*) FROM produtos')) return;
-  $lista = [ // nome, preço, custo, estoque, mínimo, ncm, unidade, categoria, trib%
-    ['Arroz Tipo 1 5kg', 27.90, 21.50, 40, 10, '10063021', 'UN', 'Mercearia', 13.5], ['Feijão Carioca 1kg', 8.49, 6.20, 55, 15, '07133399', 'UN', 'Mercearia', 13.5],
-    ['Açúcar Refinado 1kg', 4.99, 3.60, 60, 15, '17019900', 'UN', 'Mercearia', 18.0], ['Café Torrado 500g', 18.90, 14.20, 30, 8, '09012100', 'UN', 'Mercearia', 16.3],
-    ['Óleo de Soja 900ml', 7.49, 5.70, 48, 12, '15079011', 'UN', 'Mercearia', 22.0], ['Macarrão Espaguete 500g', 4.29, 2.90, 70, 15, '19021900', 'UN', 'Mercearia', 17.0],
-    ['Farinha de Trigo 1kg', 5.49, 3.90, 35, 10, '11010010', 'UN', 'Mercearia', 17.0], ['Leite Integral 1L', 5.29, 4.10, 96, 24, '04012010', 'UN', 'Laticínios', 9.0],
-    ['Manteiga 200g', 11.90, 8.70, 20, 6, '04051000', 'UN', 'Laticínios', 18.0], ['Iogurte Morango 170g', 2.99, 1.90, 40, 12, '04031000', 'UN', 'Laticínios', 18.0],
-    ['Queijo Mussarela kg', 44.90, 32.00, 8, 2, '04069090', 'KG', 'Frios', 18.0], ['Presunto Cozido kg', 34.90, 24.00, 6, 2, '16024900', 'KG', 'Frios', 18.0],
-    ['Pão Francês kg', 15.90, 7.50, 0, 0, '19059090', 'KG', 'Padaria', 17.0], ['Banana Prata kg', 6.99, 4.20, 25, 8, '08039000', 'KG', 'Hortifruti', 5.0],
-    ['Tomate kg', 8.99, 5.50, 18, 6, '07020000', 'KG', 'Hortifruti', 5.0], ['Cebola kg', 5.49, 3.20, 20, 6, '07031019', 'KG', 'Hortifruti', 5.0],
-    ['Batata kg', 6.49, 3.90, 30, 8, '07019000', 'KG', 'Hortifruti', 5.0], ['Coxa e Sobrecoxa kg', 14.90, 10.40, 15, 5, '02071400', 'KG', 'Açougue', 9.0],
-    ['Carne Moída kg', 36.90, 27.50, 10, 4, '02013000', 'KG', 'Açougue', 9.0], ['Linguiça Toscana kg', 24.90, 17.00, 9, 3, '16010000', 'KG', 'Açougue', 18.0],
-    ['Refrigerante Cola 2L', 10.99, 7.40, 45, 12, '22021000', 'UN', 'Bebidas', 33.0], ['Refrigerante Guaraná 2L', 8.99, 5.90, 40, 12, '22021000', 'UN', 'Bebidas', 33.0],
-    ['Cerveja Lata 350ml', 3.99, 2.65, 180, 48, '22030000', 'UN', 'Bebidas', 45.0], ['Água Mineral 500ml', 2.49, 1.10, 72, 24, '22011000', 'UN', 'Bebidas', 25.0],
-    ['Suco de Caixa 1L', 7.99, 5.30, 24, 6, '20098990', 'UN', 'Bebidas', 33.0], ['Sabão em Pó 800g', 13.90, 9.80, 22, 6, '34022000', 'UN', 'Limpeza', 30.0],
-    ['Detergente 500ml', 2.79, 1.75, 50, 12, '34022000', 'UN', 'Limpeza', 30.0], ['Água Sanitária 1L', 4.49, 2.90, 30, 8, '28289011', 'UN', 'Limpeza', 30.0],
-    ['Papel Higiênico 12 rolos', 21.90, 15.80, 18, 6, '48181000', 'UN', 'Higiene', 25.0], ['Creme Dental 90g', 4.99, 3.10, 36, 10, '33061000', 'UN', 'Higiene', 30.0],
-    ['Sabonete 85g', 2.49, 1.45, 60, 15, '34011190', 'UN', 'Higiene', 30.0], ['Shampoo 350ml', 15.90, 10.50, 12, 4, '33051000', 'UN', 'Higiene', 30.0],
-    ['Biscoito Recheado 130g', 3.49, 2.20, 55, 15, '19053100', 'UN', 'Mercearia', 30.0], ['Salgadinho 90g', 6.99, 4.30, 30, 10, '19049000', 'UN', 'Mercearia', 30.0],
-    ['Chocolate Barra 90g', 7.49, 4.90, 26, 8, '18063210', 'UN', 'Mercearia', 30.0], ['Ovos Brancos dúzia', 11.90, 8.60, 25, 8, '04072100', 'UN', 'Mercearia', 5.0],
-    ['Molho de Tomate 300g', 2.99, 1.80, 48, 12, '21032010', 'UN', 'Mercearia', 30.0], ['Sal Refinado 1kg', 2.79, 1.50, 30, 8, '25010020', 'UN', 'Mercearia', 18.0],
-    ['Margarina 500g', 9.49, 6.60, 3, 6, '15171000', 'UN', 'Laticínios', 18.0], ['Carvão 3kg', 19.90, 12.50, 2, 5, '44029000', 'UN', 'Diversos', 25.0],
-  ];
-  $st = db()->prepare('INSERT INTO produtos (codigo,cod_balanca,nome,preco,custo,estoque,minimo,ncm,unidade,categoria,trib_aprox,validade,promo_qtd,promo_preco,atualizado) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
-  db()->beginTransaction(); $bal = 1;
-  foreach ($lista as $i => $p) {
-    $kg = $p[6] === 'KG';
-    $validade = in_array($p[0], ['Iogurte Morango 170g', 'Presunto Cozido kg', 'Leite Integral 1L']) ? date('Y-m-d', strtotime('+' . (3 + $i % 9) . ' days')) : null;
-    $promo = $p[0] === 'Cerveja Lata 350ml' ? [12, 3.49] : [null, null];
-    $st->execute([$kg ? null : ean13('789' . str_pad((string)(910000000 + $i * 37), 9, '0', STR_PAD_LEFT)), $kg ? str_pad((string)$bal++, 4, '0', STR_PAD_LEFT) : null,
-      $p[0], $p[1], $p[2], $p[3], $p[4], $p[5], $p[6], $p[7], $p[8], $validade, $promo[0], $promo[1], agora()]);
-  }
-  $cli = [['Dona Maria (rua de cima)', '11988887777', 300, 0], ['Seu João da oficina', '11977776666', 500, 0], ['Carla - salão', '11966665555', 200, 0]];
-  foreach ($cli as $c) ex('INSERT INTO clientes (nome,telefone,limite,saldo,criado) VALUES (?,?,?,?,?)', [$c[0], $c[1], $c[2], $c[3], agora()]);
-  ex("INSERT INTO usuarios (nome,pin,perfil) VALUES ('Ana (caixa)','" . password_hash('1111', PASSWORD_DEFAULT) . "','operador')");
-  // Histórico de 30 dias para o painel ficar com cara de uso real
-  $prods = q('SELECT * FROM produtos'); mt_srand(42); $formas = ['dinheiro', 'pix', 'pix', 'debito', 'debito', 'credito', 'credito', 'credito'];
-  $iv = db()->prepare("INSERT INTO vendas (data,caixa_id,operador,subtotal,desconto,total,troco,nfce_status,chave,numero,serie,protocolo,motivo) VALUES (?,?,?,?,0,?,0,'demo',?,?,2,?,'Histórico de demonstração')");
-  $ii = db()->prepare('INSERT INTO venda_itens (venda_id,produto_id,codigo,nome,unidade,qtd,preco,total,custo,ncm,cfop,csosn,origem,trib_aprox) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
-  $ip = db()->prepare('INSERT INTO venda_pag (venda_id,forma,valor,data,conciliado) VALUES (?,?,?,?,0)');
-  $num = 1;
-  for ($d = 30; $d >= 1; $d--) {
-    $dia = date('Y-m-d', strtotime("-$d days")); $dow = (int)date('w', strtotime($dia));
-    $cx = ex("INSERT INTO caixas (abertura,fechamento,operador,valor_inicial,valor_contado,status) VALUES (?,?,?,?,?,'fechado')", ["$dia 07:00:00", "$dia 21:00:00", 'Ana (caixa)', 150, 0]);
-    $n = mt_rand(55, 85) + ($dow === 6 ? 35 : 0) + ($dow === 0 ? -15 : 0);
-    for ($k = 0; $k < $n; $k++) {
-      $h = [7, 8, 8, 9, 10, 11, 11, 12, 12, 13, 15, 16, 17, 17, 18, 18, 18, 19, 19, 20][mt_rand(0, 19)];
-      $dt = sprintf('%s %02d:%02d:%02d', $dia, $h, mt_rand(0, 59), mt_rand(0, 59));
-      $its = []; $tot = 0;
-      for ($j = 0, $m = mt_rand(1, 7); $j < $m; $j++) {
-        $p = $prods[min(count($prods) - 1, (int)floor(pow(mt_rand(0, 1000) / 1000, 1.8) * count($prods)))];
-        $q = $p['unidade'] === 'KG' ? round(mt_rand(200, 1500) / 1000, 3) : mt_rand(1, 3);
-        $t = round($q * $p['preco'], 2); $its[] = [$p, $q, $t]; $tot += $t;
-      }
-      $tot = round($tot, 2); $c43 = '35' . date('ym', strtotime($dia)) . '11222333000181652' . str_pad((string)$num, 12, '0', STR_PAD_LEFT) . '112345678';
-      $iv->execute([$dt, $cx, 'Ana (caixa)', $tot, $tot, $c43 . digitoChave($c43), $num, '135' . mt_rand(1000000000, 9999999999)]); $vid = (int)db()->lastInsertId(); $num++;
-      foreach ($its as [$p, $q, $t]) $ii->execute([$vid, $p['id'], $p['codigo'], $p['nome'], $p['unidade'], $q, $p['preco'], $t, $p['custo'], $p['ncm'], '5102', '102', '0', $p['trib_aprox']]);
-      $ip->execute([$vid, $formas[mt_rand(0, 7)], $tot, $dt]);
-    }
-  }
-  ex("UPDATE clientes SET saldo=87.40 WHERE id=1"); ex("INSERT INTO fiado_mov (cliente_id,data,tipo,valor,obs) VALUES (1,?,'compra',87.40,'Saldo inicial')", [agora()]);
-  db()->commit();
-  cfgSet(['nfce_numero' => (string)$num]);
 }

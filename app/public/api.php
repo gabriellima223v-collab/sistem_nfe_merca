@@ -78,11 +78,8 @@ try {
     ok(['info' => $info]);
   case 'validar_gerente': gerente((string)($in['pin'] ?? '')); ok();
   case 'sefaz_status': ok(sefazStatus());
-  case 'demo_carregar':
-    if (cfg('configurado') === '1') gerente();
-    carregarDemo(); ok();
   case 'zerar_dados':
-    // Sai da demonstração: apaga vendas, produtos, configuração e certificado, mas mantém a licença ativada
+    // Zera o sistema: apaga vendas, produtos, configuração e certificado, mas mantém a licença ativada
     $g = gerente((string)($in['pin'] ?? ''));
     if (($in['confirmacao'] ?? '') !== 'ZERAR') erro('Digite ZERAR para confirmar.');
     $pdo = db(); $pdo->exec('PRAGMA wal_checkpoint(TRUNCATE)');

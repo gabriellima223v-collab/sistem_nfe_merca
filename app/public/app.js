@@ -125,17 +125,15 @@ async function iniciar() {
 
 function telaLogin() {
   $('#app').classList.add('hide'); let pin = '';
-  const demo = (S.est?.ambiente || S.cfg.ambiente) === 'demo';
   $('#cheia').innerHTML = `<div class="tela-cheia"><div class="login">
     <div class="marca" style="justify-content:center;border:0;padding:0;min-height:0"><div class="logo">${ico('caixa', 24).replace('currentColor', '#fff')}</div></div>
     <h2>${esc(S.cfg.emp_fantasia || 'PDV')}</h2><div style="color:var(--mut)">Digite sua senha</div>
     <div class="pinvis">${'<i></i>'.repeat(4)}</div>
     <div class="teclado">${[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => `<button data-n="${n}">${n}</button>`).join('')}<button data-n="c" style="font-size:16px">Limpar</button><button data-n="0">0</button><button data-n="ok" style="background:var(--verde);color:#fff;font-size:16px">Entrar</button></div>
-    ${demo ? '<p class="ajuda" style="margin-top:14px">Demonstração: gerente <b>1234</b> · caixa <b>1111</b></p>' : ''}
   </div></div>`;
   const vis = () => $$('.pinvis i').forEach((i, k) => i.classList.toggle('f', k < pin.length));
   const entrar = async () => {
-    try { const r = await api('login', { pin }); S.u = r.usuario; $('#cheia').innerHTML = ''; document.removeEventListener('keydown', tec); montarApp(); }
+    try { const r = await api('login', { pin }); S.u = r.usuario; S.est = await api('estado'); S.cfg = S.est.config; $('#cheia').innerHTML = ''; document.removeEventListener('keydown', tec); montarApp(); }
     catch (e) { pin = ''; vis(); toast(e.message, 'er'); }
   };
   const tecla = n => { if (n === 'c') pin = ''; else if (n === 'ok') return entrar(); else if (pin.length < 8) pin += n; vis(); if (pin.length >= 4 && n !== 'c') { /* espera Enter p/ senhas maiores */ } };
@@ -166,8 +164,8 @@ function ir(t) {
 }
 async function atualizarStatus() {
   try {
-    const a = await api('alertas'); S.alertas = a; const amb = S.cfg.ambiente || 'demo';
-    let p = amb === 'demo' ? '<span class="pill p-in"><i></i>Modo demonstração</span>' : amb === 'homologacao' ? '<span class="pill p-av"><i></i>NFC-e em teste (homologação)</span>' : '<span class="pill p-ok"><i></i>NFC-e produção</span>';
+    const a = await api('alertas'); S.alertas = a; const amb = S.cfg.ambiente || 'homologacao';
+    let p = amb === 'homologacao' ? '<span class="pill p-av"><i></i>NFC-e em teste (homologação)</span>' : '<span class="pill p-ok"><i></i>NFC-e produção</span>';
     if (a.contingencia) p += ` <span class="pill p-er" title="Serão transmitidas automaticamente"><i></i>${a.contingencia} em contingência</span>`;
     if (a.cert_dias !== null && a.cert_dias <= 30) p += ` <span class="pill p-er"><i></i>Certificado vence em ${a.cert_dias} dias</span>`;
     $('#pillFiscal').innerHTML = p;
@@ -179,7 +177,7 @@ async function atualizarStatus() {
 }
 // Transmite notas de contingência sozinho quando a internet volta
 setInterval(async () => {
-  if (!S.u || (S.cfg.ambiente || 'demo') === 'demo' || !S.alertas?.contingencia) return;
+  if (!S.u || !S.alertas?.contingencia) return;
   try { const r = await api('contingencia_transmitir'); if (r.enviadas) { toast(`${r.enviadas} nota(s) de contingência autorizadas pela SEFAZ.`, 'ok'); atualizarStatus(); } } catch (e) {}
 }, 60000);
 
@@ -211,18 +209,13 @@ function telaLicenca(l) {
 setInterval(async () => { try { const l = (await api('licenca_estado')).licenca; if (l.status !== 'ativa') telaLicenca(l); } catch (e) {} }, 5 * 60000);
 
 // ======================= Assistente de configuração =======================
-function assistente(passo = 0, dados = {}) {
+function assistente(passo = 1, dados = {}) {
   const nomes = ['Início', 'Empresa', 'Nota fiscal', 'Teste', 'Maquininha'];
   const c = { ...S.cfg, ...dados };
-  const topo = `<div class="passos">${nomes.map((n, i) => `<div class="${i === passo ? 'on' : i < passo ? 'feito' : ''}">${i < passo ? '✓ ' : ''}${n}</div>`).join('')}</div>`;
+  const topo = `<div class="passos">${nomes.map((n, i) => i === 0 ? '' : `<div class="${i === passo ? 'on' : i < passo ? 'feito' : ''}">${i < passo ? '✓ ' : ''}${n}</div>`).join('')}</div>`;
   const campo = (k, rot, tipo = 'text', extra = '') => `<div class="campo"><label for="w_${k}">${rot}</label><input id="w_${k}" data-k="${k}" type="${tipo}" value="${esc(c[k] ?? '')}" ${extra}></div>`;
   let corpo = '';
-  if (passo === 0) corpo = `<h2>Bem-vindo ao seu novo PDV</h2><p style="color:var(--mut);margin:0">Como você quer começar?</p>
-    <div class="escolha">
-      <button id="wDemo">${ico('painel', 30)}<b>Ver funcionando agora</b><span>Abre com uma loja de exemplo, 40 produtos e 30 dias de vendas. As notas são simuladas, sem valor fiscal.</span></button>
-      <button id="wReal">${ico('config', 30)}<b>Configurar a minha loja</b><span>CNPJ, certificado A1 e CSC. Leva uns 5 minutos.</span></button>
-    </div>`;
-  if (passo === 1) corpo = `<h2>Dados da empresa</h2><p class="ajuda" style="margin-bottom:14px">Digite o CNPJ e clique em Buscar: o resto é preenchido sozinho.</p>
+  if (passo === 1) corpo = `<h2>Bem-vindo! Dados da empresa</h2><p class="ajuda" style="margin-bottom:14px">Digite o CNPJ e clique em Buscar: o resto é preenchido sozinho.</p>
     <div class="linha" style="align-items:flex-end"><div style="flex:1">${campo('emp_cnpj', 'CNPJ', 'text', 'inputmode="numeric" placeholder="00.000.000/0000-00"')}</div><button class="btn pri" id="wBusca" style="margin-bottom:12px">Buscar</button></div>
     <div class="grid g2">${campo('emp_razao', 'Razão social')}${campo('emp_fantasia', 'Nome fantasia (aparece no cupom)')}</div>
     <div class="grid g3">${campo('emp_ie', 'Inscrição Estadual', 'text', 'inputmode="numeric"')}
@@ -248,14 +241,9 @@ function assistente(passo = 0, dados = {}) {
       <p class="ajuda">No site mercadopago.com.br/developers → Suas integrações → Criar aplicação → Credenciais de produção. Depois você escolhe a maquininha em Configurações.</p></div>
     <p class="ajuda">A senha inicial do gerente é <b>1234</b>. Troque em Configurações → Usuários depois de entrar.</p>`;
   $('#cheia').innerHTML = `<div class="tela-cheia"><div class="wiz">${topo}<div class="corpo">${corpo}</div>
-    ${passo ? `<div class="linha" style="padding:0 26px 22px;justify-content:space-between"><button class="btn" id="wVoltar">Voltar</button><button class="btn pri lg" id="wProx">${passo === 4 ? 'Concluir e entrar' : 'Continuar'}</button></div>` : ''}</div></div>`;
+    ${passo ? `<div class="linha" style="padding:0 26px 22px;justify-content:space-between"><button class="btn ${passo === 1 ? 'hide' : ''}" id="wVoltar">Voltar</button><button class="btn pri lg" id="wProx">${passo === 4 ? 'Concluir e entrar' : 'Continuar'}</button></div>` : ''}</div></div>`;
   $$('#cheia select[data-k]').forEach(s => { if (c[s.dataset.k]) s.value = c[s.dataset.k]; });
   const coletar = () => { $$('#cheia [data-k]').forEach(i => { dados[i.dataset.k] = i.value.trim(); }); return dados; };
-  if (passo === 0) {
-    $('#wDemo').onclick = async () => { $('#wDemo').disabled = true; $('#wDemo b').textContent = 'Preparando a loja de exemplo…'; try { await api('demo_carregar'); location.reload(); } catch (e) { toast(e.message, 'er'); } };
-    $('#wReal').onclick = () => assistente(1, dados);
-    return;
-  }
   $('#wVoltar').onclick = () => assistente(passo - 1, coletar());
   if (passo === 1) {
     const buscar = async () => { try { const r = await api('cnpj_consulta', { cnpj: $('#w_emp_cnpj').value }); Object.assign(dados, r.dados, { emp_cnpj: $('#w_emp_cnpj').value });
@@ -497,9 +485,9 @@ function pagamento() {
   };
   desenha();
 }
-// Maquininha: integrada (Mercado Pago), simulada (demo) ou manual
+// Maquininha: integrada (Mercado Pago) ou separada (manual)
 function cobrarMaquininha(forma, valor) {
-  const tipo = S.cfg.ambiente === 'demo' && S.cfg.maquininha !== 'mp' ? 'demo' : (S.cfg.maquininha || 'manual');
+  const tipo = S.cfg.maquininha === 'mp' ? 'mp' : 'manual';
   return new Promise(res => {
     let fim = false; const fecha = (r, m) => { if (fim) return; fim = true; m.fechar(); res(r); };
     if (tipo === 'manual' || (tipo === 'mp' && forma === 'pix')) {
@@ -507,13 +495,8 @@ function cobrarMaquininha(forma, valor) {
         botoes: [{ txt: 'Não aprovou', acao: () => fecha(null, m) }, { txt: 'Aprovado ✓', cls: 'pri', acao: () => fecha({ integrado: 0 }, m) }] });
       new MutationObserver((_, o) => { if (!m.el.isConnected) { o.disconnect(); if (!fim) { fim = true; res(null); } } }).observe($('#modais'), { childList: true }); return;
     }
-    const m = modal({ titulo: 'Maquininha', fechavel: false, corpo: `<div class="maq"><div class="anel"></div><h2 style="margin:0 0 4px">${R(valor)} · ${FORMAS[forma]}</h2><p id="mqMsg" style="font-size:17px">${forma === 'pix' ? 'Mostrando QR Code do PIX…' : 'Valor enviado. Peça para o cliente aproximar ou inserir o cartão.'}</p>${tipo === 'demo' ? '<p class="ajuda">Simulação: a maquininha aprova em instantes.</p>' : ''}</div>`,
+    const m = modal({ titulo: 'Maquininha', fechavel: false, corpo: `<div class="maq"><div class="anel"></div><h2 style="margin:0 0 4px">${R(valor)} · ${FORMAS[forma]}</h2><p id="mqMsg" style="font-size:17px">${forma === 'pix' ? 'Mostrando QR Code do PIX…' : 'Valor enviado. Peça para o cliente aproximar ou inserir o cartão.'}</p></div>`,
       botoes: [{ txt: 'Cancelar cobrança', acao: async () => { if (tipo === 'mp' && m.id) await api('mp_cancelar', { id: m.id }).catch(() => {}); fecha(null, m); return false; } }] });
-    if (tipo === 'demo') {
-      if (forma === 'pix') $('.maq', m.el).insertAdjacentHTML('afterbegin', `<div style="display:flex;justify-content:center;margin-bottom:8px">${qrSVG('00020126DEMO-PIX-' + valor, 170)}</div>`), $('.anel', m.el).remove();
-      setTimeout(() => fecha({ integrado: 1, bandeira: forma === 'pix' ? '' : ['visa', 'master', 'elo'][Math.floor(Math.random() * 3)], autorizacao: String(Math.floor(100000 + Math.random() * 899999)), nsu: String(Date.now()).slice(-9) }, m), forma === 'pix' ? 3000 : 2200);
-      return;
-    }
     api('mp_cobrar', { valor, tipo: forma, ref: 'pdv-' + Date.now() }).then(r => {
       m.id = r.id; const t0 = Date.now();
       const poll = async () => {
@@ -532,7 +515,7 @@ function cobrarMaquininha(forma, valor) {
 // ----- Cupom (DANFCE) -----
 function cupomHTML(v) {
   const c = S.cfg; const st = v.nfce_status;
-  const aviso = st === 'demo' ? 'SIMULAÇÃO - SEM VALOR FISCAL' : (c.ambiente === 'homologacao' && st !== 'rejeitada') ? 'EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL' : st === 'contingencia' ? 'EMITIDA EM CONTINGÊNCIA<br>Pendente de autorização' : '';
+  const aviso = (c.ambiente === 'homologacao' && st !== 'rejeitada') ? 'EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL' : st === 'contingencia' ? 'EMITIDA EM CONTINGÊNCIA<br>Pendente de autorização' : '';
   const trib = v.itens.reduce((s, i) => s + (i.total - i.desconto) * (+i.trib_aprox || 0) / 100, 0);
   const pags = v.pagamentos.map(p => `<tr><td>${FORMAS[p.forma] || p.forma}</td><td style="text-align:right">${N2(p.valor + (p.forma === 'dinheiro' ? +v.troco : 0))}</td></tr>`).join('');
   const chave = (v.chave || '').replace(/(\d{4})/g, '$1 ').trim();
@@ -559,7 +542,7 @@ function cupomHTML(v) {
 }
 function imprimirCupom(v) { $('#impressao').innerHTML = cupomHTML(v); setTimeout(() => window.print(), 50); }
 function mostrarCupom(v, depoisVenda = false) {
-  const st = { demo: ['p-in', 'Simulada'], autorizada: ['p-ok', 'Autorizada pela SEFAZ'], contingencia: ['p-av', 'Contingência (será transmitida)'], rejeitada: ['p-er', 'Não emitida'] }[v.nfce_status] || ['p-in', v.nfce_status];
+  const st = { autorizada: ['p-ok', 'Autorizada pela SEFAZ'], contingencia: ['p-av', 'Contingência (será transmitida)'], rejeitada: ['p-er', 'Não emitida'] }[v.nfce_status] || ['p-in', v.nfce_status];
   const botoes = [];
   if (v.nfce_status === 'rejeitada' && v.status === 'ok') botoes.push({ txt: 'Tentar emitir de novo', acao: async () => { const r = await api('venda_reemitir', { id: v.id }); mostrarCupom(r.venda, depoisVenda); atualizarStatus(); } });
   if (!depoisVenda && v.status === 'ok') botoes.push({ txt: 'Cancelar venda', cls: 'dan', acao: () => { cancelarVendaUI(v); } });
@@ -770,13 +753,13 @@ async function telaConfig() {
     <div class="card"><h2>Empresa</h2><div class="grid g2">${f('emp_cnpj', 'CNPJ')}${f('emp_ie', 'Inscrição Estadual')}</div><div class="grid g2">${f('emp_razao', 'Razão social')}${f('emp_fantasia', 'Nome fantasia')}</div>
       <div class="grid g3">${f('emp_logradouro', 'Endereço')}${f('emp_numero', 'Número')}${f('emp_bairro', 'Bairro')}</div><div class="grid g4">${f('emp_municipio', 'Cidade')}${f('emp_uf', 'UF')}${f('emp_cep', 'CEP')}${f('emp_cmun', 'Cód. IBGE')}</div>
       ${sel('emp_crt', 'Regime', [['1', 'Simples Nacional'], ['4', 'MEI'], ['3', 'Regime normal']])}</div>
-    <div class="card"><h2>Nota fiscal (NFC-e)</h2>${sel('ambiente', 'Ambiente', [['demo', 'Demonstração (simulado, sem SEFAZ)'], ['homologacao', 'Teste na SEFAZ (homologação)'], ['producao', 'Produção (valendo)']])}
+    <div class="card"><h2>Nota fiscal (NFC-e)</h2>${sel('ambiente', 'Ambiente', [['homologacao', 'Teste na SEFAZ (homologação)'], ['producao', 'Produção (valendo)']])}
       <div class="grid g2">${f('nfce_serie', 'Série', 'number')}${f('nfce_numero', 'Próximo número', 'number')}</div><div class="grid g2">${f('csc', 'CSC', 'password')}${f('csc_id', 'ID do CSC')}</div>
       <div class="card" style="box-shadow:none;border:1px solid var(--linha);padding:12px;margin-bottom:12px"><b>Certificado A1</b> ${c.cert_validade ? `<span class="pill ${new Date(c.cert_validade) - Date.now() < 30 * 864e5 ? 'p-er' : 'p-ok'}"><i></i>válido até ${c.cert_validade.split('-').reverse().join('/')}</span>` : '<span class="pill p-av"><i></i>não enviado</span>'}
         <div class="linha" style="margin-top:8px"><input type="file" id="cfc" accept=".pfx,.p12" style="flex:1"><input type="password" id="cfs" placeholder="Senha" style="width:140px"><button class="btn" id="cfe">Enviar</button></div></div>
       <div class="linha"><button class="btn" id="tsf">Testar conexão com a SEFAZ</button><span id="tsr" class="ajuda"></span></div>
       ${est.biblioteca ? '' : '<p class="p-av" style="padding:10px;border-radius:10px;margin-top:10px">Biblioteca fiscal ainda não instalada: gere o instalador com o <b>gerar-instalador.bat</b> antes de usar homologação/produção.</p>'}</div>
-    <div class="card"><h2>Maquininha</h2>${sel('maquininha', 'Tipo', [['manual', 'Separada (caixa digita e confirma)'], ['mp', 'Mercado Pago Point integrada'], ['demo', 'Simulada (demonstração)']])}
+    <div class="card"><h2>Maquininha</h2>${sel('maquininha', 'Tipo', [['manual', 'Separada (caixa digita e confirma)'], ['mp', 'Mercado Pago Point integrada']])}
       ${f('cnpj_credenciadora', 'CNPJ da credenciadora (opcional, vai na NFC-e)')}${f('mp_token', 'Access Token Mercado Pago', 'password')}
       <div class="linha"><select data-k="mp_terminal" id="mpt" style="flex:1"><option value="${esc(c.mp_terminal || '')}">${esc(c.mp_terminal || 'Nenhuma maquininha escolhida')}</option></select><button class="btn" id="mpb">Buscar maquininhas</button></div>
       <p class="ajuda">A maquininha precisa estar no modo PDV (no app do Mercado Pago).</p></div>
@@ -785,14 +768,14 @@ async function telaConfig() {
     <div class="card"><h2>Usuários</h2><table><tbody>${u.lista.map(x => `<tr><td><b>${esc(x.nome)}</b></td><td>${x.perfil === 'gerente' ? 'Gerente' : 'Caixa'}</td><td>${x.ativo == 1 ? '' : '<span class="chip p-er">inativo</span>'}</td><td class="r"><button class="btn sm" data-u="${x.id}">Editar</button></td></tr>`).join('')}</tbody></table><button class="btn" id="nu" style="margin-top:10px">+ Novo usuário</button></div>
     <div class="card"><h2>Responsável técnico e backup</h2><p class="ajuda" style="margin-bottom:10px">Alguns estados exigem os dados de quem fez o sistema na NFC-e.</p><div class="grid g2">${f('resp_cnpj', 'CNPJ do desenvolvedor')}${f('resp_nome', 'Nome de contato')}</div><div class="grid g2">${f('resp_email', 'E-mail')}${f('resp_fone', 'Telefone')}</div>
       <button class="btn" id="bk">Baixar cópia de segurança</button></div>
-    <div class="card" style="border:2px solid var(--tomate-cl)"><h2>${c.ambiente === 'demo' ? 'Sair da demonstração' : 'Zerar o sistema'}</h2><p class="ajuda" style="margin-bottom:10px">Apaga vendas, produtos, clientes, configurações e o certificado, e volta para o assistente de configuração. <b>A licença continua ativada.</b> A senha do gerente volta a ser 1234.</p><button class="btn dan" id="zr">${c.ambiente === 'demo' ? 'Sair da demonstração e configurar a loja' : 'Zerar todos os dados'}</button></div>
+    <div class="card" style="border:2px solid var(--tomate-cl)"><h2>Zerar o sistema</h2><p class="ajuda" style="margin-bottom:10px">Apaga vendas, produtos, clientes, configurações e o certificado, e volta para o assistente de configuração. <b>A licença continua ativada.</b> A senha do gerente volta a ser 1234.</p><button class="btn dan" id="zr">Zerar todos os dados</button></div>
   </div><div style="position:sticky;bottom:0;padding:14px 0;text-align:right"><button class="btn pri lg" id="sv">Salvar configurações</button></div>`;
   $('#sv').onclick = async () => { const d = {}; $$('#tela [data-k]').forEach(i => d[i.dataset.k] = i.value.trim()); try { const r = await api('config_salvar', d); S.cfg = r.config; toast('Configurações salvas.', 'ok'); atualizarStatus(); $('#nomeLoja').textContent = S.cfg.emp_fantasia || S.cfg.emp_razao; } catch (e) { toast(e.message, 'er'); } };
   $('#cfe').onclick = async () => { const fl = $('#cfc').files[0]; if (!fl) return toast('Escolha o arquivo .pfx', 'er'); try { const r = await api('certificado', { senha: $('#cfs').value }, fl); toast('Certificado válido até ' + r.info.validade.split('-').reverse().join('/'), 'ok'); telaConfig(); } catch (e) { toast(e.message, 'er'); } };
   $('#tsf').onclick = async () => { $('#tsr').textContent = 'Testando…'; try { const r = await api('sefaz_status'); $('#tsr').innerHTML = `<b class="${r.ok ? 'sobe' : 'desce'}">${esc(r.msg)}</b>`; } catch (e) { $('#tsr').innerHTML = `<b class="desce">${esc(e.message)}</b>`; } };
   $('#mpb').onclick = async () => { try { await api('config_salvar', { mp_token: $('[data-k=mp_token]').value }); const r = await api('mp_terminais'); $('#mpt').innerHTML = r.lista.map(t => `<option value="${esc(t.id)}">${esc(t.id)} (${esc(t.modo)})</option>`).join('') || '<option value="">Nenhuma encontrada</option>'; toast(r.lista.length + ' maquininha(s). Escolha e salve.', 'ok'); } catch (e) { toast(e.message, 'er'); } };
   $('#bk').onclick = () => { location.href = 'api.php?acao=backup'; };
-  $('#zr').onclick = () => modal({ titulo: 'Zerar o sistema', corpo: `<p style="margin-top:0">Isso <b>apaga tudo</b> (vendas, produtos, clientes, configurações e certificado). Não tem como desfazer.${c.ambiente === 'demo' ? '' : ' <b>Baixe a cópia de segurança antes.</b>'}</p><div class="campo"><label>Senha do gerente</label><input id="zp" type="password" inputmode="numeric"></div><div class="campo"><label>Digite ZERAR para confirmar</label><input id="zc" autocomplete="off"></div>`,
+  $('#zr').onclick = () => modal({ titulo: 'Zerar o sistema', corpo: `<p style="margin-top:0">Isso <b>apaga tudo</b> (vendas, produtos, clientes, configurações e certificado). Não tem como desfazer. <b>Baixe a cópia de segurança antes.</b></p><div class="campo"><label>Senha do gerente</label><input id="zp" type="password" inputmode="numeric"></div><div class="campo"><label>Digite ZERAR para confirmar</label><input id="zc" autocomplete="off"></div>`,
     botoes: [{ txt: 'Cancelar' }, { txt: 'Zerar', cls: 'dan', acao: async f => { await api('zerar_dados', { pin: $('#zp', f).value, confirmacao: $('#zc', f).value.trim().toUpperCase() }); try { localStorage.clear(); } catch (e) {} location.reload(); } }] });
   const edU = x => modal({ titulo: x.id ? 'Editar usuário' : 'Novo usuário', corpo: `<div class="campo"><label>Nome</label><input id="un" value="${esc(x.nome || '')}"></div><div class="grid g2"><div class="campo"><label>Senha (números)</label><input id="up" type="password" inputmode="numeric" placeholder="${x.id ? 'deixe em branco p/ manter' : 'mín. 4 números'}"></div><div class="campo"><label>Perfil</label><select id="uf"><option value="operador">Caixa</option><option value="gerente">Gerente</option></select></div></div>${x.id ? `<label><input type="checkbox" id="ua" ${x.ativo == 1 ? 'checked' : ''} style="width:auto;min-height:0"> Ativo</label>` : ''}`,
     aoAbrir: f => { if (x.perfil) $('#uf', f).value = x.perfil; },

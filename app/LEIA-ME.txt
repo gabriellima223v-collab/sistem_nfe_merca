@@ -28,23 +28,21 @@ transmite as notas sozinho quando a conexão volta.
 --------------------------------------------------------------
 2) PRIMEIRA VEZ QUE ABRIR
 --------------------------------------------------------------
-Aparece o assistente com duas opções:
+ 1. Digite a CHAVE DE ACESSO (só na primeira vez).
+ 2. O assistente pede:
+    • CNPJ (clique em Buscar: o resto é preenchido sozinho) e a
+      Inscrição Estadual;
+    • certificado A1 (.pfx + senha), CSC e ID do CSC;
+    • série (use 2, diferente do sistema antigo) e próximo número (1).
+    Comece em "Teste (homologação)": as notas vão para a SEFAZ mas não
+    têm valor fiscal. Depois troque para "Produção" em Configurações.
+ 3. Entre com a senha do gerente: 1234 (troque em Configurações >
+    Usuários) e abra o caixa.
 
- • VER FUNCIONANDO AGORA  -> loja de exemplo com 40 produtos e 30 dias
-   de vendas. Notas e maquininha simuladas. Use para apresentar.
-   Senhas: gerente 1234 / caixa 1111
-
- • CONFIGURAR A MINHA LOJA -> CNPJ (busca os dados sozinho),
-   certificado A1 (.pfx + senha), CSC e ID do CSC, série e número.
-   Comece em "Teste (homologação)": as notas vão para a SEFAZ mas não
-   têm valor fiscal. Quando estiver tudo certo, troque para "Produção"
-   em Configurações.
-
-Para sair da demonstração e configurar a loja de verdade:
-Configurações > "Sair da demonstração e configurar a loja" (senha do
-gerente + digitar ZERAR). A licença continua ativada.
-NUNCA apague a pasta C:\PDV\dados na mão: ela guarda a identificação
-do computador usada pela licença.
+ Para recomeçar do zero: Configurações > "Zerar todos os dados"
+ (senha do gerente + digitar ZERAR). A licença continua ativada.
+ NUNCA apague a pasta C:\PDV\dados na mão: ela guarda a identificação
+ do computador usada pela licença.
 
 
 --------------------------------------------------------------
