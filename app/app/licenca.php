@@ -49,17 +49,24 @@ function licEstado(bool $forcar = false): array {
     try { $l = licAplicar($l, licChamar('verificar', $l['chave'])); } catch (Throwable $e) { /* sem internet: continua com o último estado conhecido */ }
     licGravar($l);
   }
+  // Antifraude do relógio: atrasar a data do computador não estende a vigência
+  $maior = (int)($l['maior_hora'] ?? 0);
+  if ($agora > $maior + 300) { $l['maior_hora'] = $agora; licGravar($l); }
   $st = $l['status'] ?? 'ativa';
+  if ($st === 'ativa' && ($agora < $maior - 6 * 3600 || !empty($l['relogio_errado']))) $st = 'relogio';
   if ($st === 'ativa' && !empty($l['vence']) && date('Y-m-d') > $l['vence']) $st = 'vencida'; // vale mesmo sem internet
   if ($st === 'ativa' && $agora - ($l['ultimo_ok'] ?? $agora) > LIC_TOLERANCIA_OFFLINE * 86400) $st = 'offline_demais';
   $msg = $l['msg'] ?? '';
   if ($st === 'vencida' && !$msg) $msg = 'O acesso venceu em ' . date('d/m/Y', strtotime($l['vence'])) . '. Entre em contato para renovar.';
+  if ($st === 'relogio') $msg = 'A data ou a hora deste computador está errada (agora marca ' . date('d/m/Y H:i') . '). Acerte o relógio do Windows e clique em Verificar. Com o relógio errado a nota fiscal também é rejeitada.';
   return ['status' => $st, 'cliente' => $l['cliente'] ?? '', 'msg' => $msg, 'contato' => $l['contato'] ?? '', 'vence' => $l['vence'] ?? '',
     'empresa' => cfg('emp_fantasia') ?: cfg('emp_razao'), 'cnpj' => cfg('emp_cnpj')];
 }
 // Aplica a resposta do servidor ao estado salvo no computador
 function licAplicar(array $l, array $r): array {
   $st = $r['status'] ?? '';
+  // compara o relógio do computador com o do servidor (diferença de mais de 1 dia = relógio adulterado)
+  if (!empty($r['ts'])) { $dif = abs(time() - (int)round($r['ts'] / 1000)); $l['relogio_errado'] = $dif > 86400; if ($dif <= 86400) $l['maior_hora'] = max(time(), (int)round($r['ts'] / 1000)); }
   if (in_array($st, ['ativa', 'pendente', 'bloqueada', 'vencida'], true)) {
     $l['status'] = $st; $l['msg'] = $r['msg'] ?? '';
     if ($st === 'ativa') { $l['ultimo_ok'] = time(); }

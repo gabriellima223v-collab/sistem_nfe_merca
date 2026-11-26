@@ -75,4 +75,5 @@ function q1(string $sql, array $p = []) { $s = db()->prepare($sql); $s->execute(
 function qv(string $sql, array $p = []) { $s = db()->prepare($sql); $s->execute($p); return $s->fetchColumn(); }
 function ex(string $sql, array $p = []): int { $s = db()->prepare($sql); $s->execute($p); return (int)db()->lastInsertId(); }
 function agora(): string { return date('Y-m-d H:i:s'); }
+function num2($v): string { return number_format((float)$v, 2, ',', '.'); }
 function logar(string $usuario, string $acao, string $det = ''): void { ex('INSERT INTO log (data,usuario,acao,detalhe) VALUES (?,?,?,?)', [agora(), $usuario, $acao, $det]); }

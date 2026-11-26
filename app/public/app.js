@@ -86,6 +86,7 @@ const IC = {
   clientes: '<circle cx="9" cy="8" r="4"/><path d="M2 21a7 7 0 0 1 14 0M17 11a3 3 0 1 0 0-6M22 21a5 5 0 0 0-4-5"/>',
   vendas: '<path d="M6 2h12v20l-3-2-3 2-3-2-3 2zM9 7h6M9 11h6M9 15h4"/>',
   conciliacao: '<path d="M3 7h13l-3-3M21 17H8l3 3M7 11v2M17 11v2"/>',
+  auditoria: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/><path d="M9 12l2 2 4-4"/>',
   config: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   dinheiro: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/>',
   pix: '<path d="M12 2l4 4-4 4-4-4zM12 14l4 4-4 4-4-4zM2 12l4-4 4 4-4 4zM14 12l4-4 4 4-4 4z"/>',
@@ -110,6 +111,7 @@ const TELAS = [
   { id: 'clientes', nome: 'Clientes e fiado', ic: 'clientes', todos: true },
   { id: 'vendas', nome: 'Vendas e NFC-e', ic: 'vendas', todos: true },
   { id: 'conciliacao', nome: 'Conciliação', ic: 'conciliacao' },
+  { id: 'auditoria', nome: 'Auditoria', ic: 'auditoria' },
   { id: 'config', nome: 'Configurações', ic: 'config' },
 ];
 
@@ -169,7 +171,7 @@ function ir(t) {
   $$('#menu a').forEach(a => a.classList.toggle('on', a.dataset.t === t));
   $('#titulo').textContent = TELAS.find(x => x.id === t).nome; $('#topoExtra').innerHTML = '';
   $('#tela').innerHTML = '<div class="vazio">Carregando…</div>';
-  Promise.resolve(({ caixa: telaCaixa, painel: telaPainel, produtos: telaProdutos, entrada: telaEntrada, clientes: telaClientes, vendas: telaVendas, conciliacao: telaConciliacao, config: telaConfig })[t]())
+  Promise.resolve(({ caixa: telaCaixa, painel: telaPainel, produtos: telaProdutos, entrada: telaEntrada, clientes: telaClientes, vendas: telaVendas, conciliacao: telaConciliacao, auditoria: telaAuditoria, config: telaConfig })[t]())
     .catch(e => { if (e.code !== 402 && e.code !== 401) { toast(e.message, 'er'); $('#tela').innerHTML = `<div class="vazio">${esc(e.message)}</div>`; } });
 }
 async function atualizarStatus() {
@@ -219,6 +221,7 @@ function telaLicenca(l) {
     sem_licenca: ['envio', 'var(--verde)', l.erroEnvio ? 'Não foi possível enviar' : 'Pedir acesso de novo', esc(l.msg || 'Envie o pedido de acesso.'), `<button class="btn pri lg" id="licE" style="width:100%">Enviar pedido de acesso</button>`],
     bloqueada: ['cadeado', 'var(--tomate)', 'Acesso bloqueado', 'O uso deste sistema foi suspenso. Entre em contato com o suporte para liberar.', `<button class="btn pri lg" id="licV" style="width:100%">Verificar de novo</button>`],
     vencida: ['calendario', 'var(--ambar)', 'Acesso vencido', esc(l.msg || 'A vigência do acesso terminou. Entre em contato para renovar.'), `<button class="btn pri lg" id="licV" style="width:100%">Já renovei, verificar</button>`],
+    relogio: ['relogio', 'var(--tomate)', 'Relógio do computador errado', esc(l.msg || 'Acerte a data e a hora do Windows.'), `<button class="btn pri lg" id="licV" style="width:100%">Já acertei, verificar</button>`],
     offline_demais: ['wifi', 'var(--tomate)', 'Conecte à internet', 'Faz muitos dias que o sistema não consegue confirmar o acesso. Conecte este computador à internet e clique em Verificar.', `<button class="btn pri lg" id="licV" style="width:100%">Verificar de novo</button>`],
   }[l.status] || ['cadeado', 'var(--tomate)', 'Acesso', esc(l.msg || ''), `<button class="btn pri lg" id="licV" style="width:100%">Verificar de novo</button>`];
   $('#cheia').innerHTML = `<div class="tela-cheia"><div class="login" style="width:min(460px,100%)">
@@ -458,13 +461,16 @@ async function acaoPDV(a) {
   if (a === 'rem') {
     if (v.sel < 0 || !v.itens[v.sel]) return toast('Selecione o item com as setas ↑ ↓ ou clicando nele.');
     const it = v.itens[v.sel];
-    if (S.u.perfil !== 'gerente') { const pin = await pedirPIN(`Remover "${it.p.nome}" da venda`); if (!pin) return foco(); try { await api('validar_gerente', { pin }); } catch (e) { toast(e.message, 'er'); return foco(); } }
     if (!await confirmar('Remover item', `Remover <b>${esc(it.p.nome)}</b> da venda?`, 'Remover', 'dan')) return foco();
+    const det = `${it.p.nome} · ${String(it.qtd).replace('.', ',')} × ${R(it.preco ?? it.p.preco)}`;
+    try { await comGerente(pin => api('caixa_ocorrencia', { tipo: 'item_removido', detalhe: det, pin }), `Remover "${it.p.nome}" da venda`); } catch (e) { toast(e.message, 'er'); return foco(); }
     v.itens.splice(v.sel, 1); v.sel = v.itens.length - 1; salvarVenda(); desenharCesta(); return foco();
   }
   if (a === 'canc') {
     if (!v.itens.length) return;
     if (!await confirmar('Cancelar venda', 'Limpar todos os itens desta venda?', 'Cancelar venda', 'dan')) return foco();
+    const det = `${v.itens.length} itens · ${R(subtotal())}: ` + v.itens.slice(0, 8).map(i => i.p.nome).join(', ') + (v.itens.length > 8 ? '…' : '');
+    try { await comGerente(pin => api('caixa_ocorrencia', { tipo: 'venda_limpa', detalhe: det, pin }), 'Cancelar a venda em andamento'); } catch (e) { toast(e.message, 'er'); return foco(); }
     S.venda = novaVenda(); salvarVenda(); desenharCesta(); mostrarMult(); return foco();
   }
   if (a === 'pagar') { if (!v.itens.length) return toast('Passe pelo menos um produto.'); return pagamento(); }
@@ -809,6 +815,34 @@ async function lerXlsx(arq) {
   }
   if (linhas.length < 2) throw new Error('A primeira aba da planilha está vazia.');
   return { aba: nomeAba, linhas };
+}
+
+// ======================= AUDITORIA (antifraude) =======================
+const AUD = {
+  item_removido: ['Item removido da venda', 'av'], venda_limpa: ['Venda em andamento cancelada', 'av'], venda_cancelar: ['Venda finalizada cancelada', 'er'],
+  desconto: ['Desconto', 'av'], fiado_acima_limite: ['Fiado acima do limite', 'av'], sangria: ['Sangria', 'in'], suprimento: ['Suprimento', 'in'],
+  produto_alterado: ['Produto alterado (preço/estoque)', 'av'], produto_excluido: ['Produto excluído', 'av'], produto_novo: ['Produto cadastrado', 'in'],
+  etiqueta_divergente: ['Etiqueta de balança não confere', 'er'], senha_errada: ['Senha errada', 'av'], senha_bloqueada: ['Senha travada (muitas tentativas)', 'er'],
+  login: ['Entrou no sistema', 'in'], caixa_abrir: ['Abriu o caixa', 'in'], caixa_fechar: ['Fechou o caixa', 'in'], entrada_xml: ['Entrada de nota (XML)', 'in'], produto_salvar: ['Produto salvo', 'in'],
+};
+async function telaAuditoria() {
+  const hoje = new Date().toLocaleDateString('sv-SE'), semana = new Date(Date.now() - 6 * 864e5).toLocaleDateString('sv-SE');
+  $('#tela').innerHTML = `<div class="card"><div class="linha" style="flex-wrap:wrap;gap:10px;margin-bottom:12px">
+      <div class="campo" style="margin:0"><label>De</label><input type="date" id="ad" value="${semana}"></div><div class="campo" style="margin:0"><label>Até</label><input type="date" id="aa" value="${hoje}"></div>
+      <div class="campo" style="margin:0;min-width:240px"><label>Mostrar</label><select id="af"><option value="risco">Só o que merece atenção</option><option value="">Tudo</option>${Object.entries(AUD).map(([k, v]) => `<option value="${k}">${v[0]}</option>`).join('')}</select></div>
+      <button class="btn" id="ab" style="align-self:flex-end">Atualizar</button></div>
+    <p class="ajuda" style="margin:0 0 10px">Tudo que pode virar desvio fica registrado aqui com quem fez e quem autorizou: itens tirados da venda, vendas canceladas, descontos, sangrias, mudança de preço e de estoque, senhas erradas.</p>
+    <div id="ares"></div></div>`;
+  const risco = ['item_removido', 'venda_limpa', 'venda_cancelar', 'desconto', 'fiado_acima_limite', 'sangria', 'produto_alterado', 'produto_excluido', 'etiqueta_divergente', 'senha_errada', 'senha_bloqueada'];
+  const carregar = async () => {
+    const f = $('#af').value; const r = await api('auditoria', { de: $('#ad').value, ate: $('#aa').value, tipo: f === 'risco' ? risco : f ? [f] : undefined });
+    const cont = {}; r.lista.forEach(x => cont[x.acao] = (cont[x.acao] || 0) + 1);
+    const resumo = risco.filter(k => cont[k]).map(k => `<span class="pill p-${AUD[k][1] === 'er' ? 'er' : 'av'}">${AUD[k][0]}: <b>${cont[k]}</b></span>`).join(' ');
+    $('#ares').innerHTML = (resumo ? `<div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">${resumo}</div>` : '') +
+      `<div class="tabela" style="max-height:calc(100vh - 330px)"><table><thead><tr><th>Quando</th><th>O que</th><th>Quem</th><th>Detalhe</th></tr></thead><tbody>${r.lista.map(x => { const a = AUD[x.acao] || [x.acao, 'in'];
+        return `<tr><td style="white-space:nowrap">${dataBR(x.data)}</td><td><span class="pill p-${a[1] === 'er' ? 'er' : a[1] === 'av' ? 'av' : 'in'}">${esc(a[0])}</span></td><td>${esc(x.usuario)}</td><td>${esc(x.detalhe || '')}</td></tr>`; }).join('') || '<tr><td colspan="4" class="vazio">Nada registrado no período.</td></tr>'}</tbody></table></div>`;
+  };
+  $('#ab').onclick = carregar; $('#af').onchange = carregar; $('#ad').onchange = carregar; $('#aa').onchange = carregar; await carregar();
 }
 
 // ======================= ENTRADA DE NOTAS =======================

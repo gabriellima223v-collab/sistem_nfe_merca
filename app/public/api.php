@@ -5,6 +5,28 @@
 declare(strict_types=1);
 date_default_timezone_set('America/Sao_Paulo');
 ini_set('display_errors', '0');
+
+// ---------- Proteção contra ataques vindos de outros sites ----------
+// O PDV só responde a ele mesmo (127.0.0.1/localhost). Um site aberto no navegador do caixa
+// não consegue mandar comandos para cá (CSRF) nem se passar pelo PDV (DNS rebinding).
+(function () {
+  $host = strtolower((string)($_SERVER['HTTP_HOST'] ?? ''));
+  $local = fn($h) => (bool)preg_match('/^(127\.0\.0\.1|localhost|\[::1\])(:\d+)?$/', $h);
+  $origem = (string)($_SERVER['HTTP_ORIGIN'] ?? '');
+  $site = strtolower((string)($_SERVER['HTTP_SEC_FETCH_SITE'] ?? ''));
+  $bloq = !$local($host)
+    || ($origem !== '' && $origem !== 'null' && strtolower($origem) !== 'http://' . $host)
+    || $origem === 'null' || $site === 'cross-site';
+  if ($bloq || ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'OPTIONS') {
+    http_response_code(403); header('Content-Type: application/json; charset=utf-8');
+    echo json_encode(['ok' => false, 'erro' => 'Acesso negado.']); exit;
+  }
+})();
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Cache-Control: no-store');
+session_set_cookie_params(['lifetime' => 0, 'path' => '/', 'httponly' => true, 'samesite' => 'Strict']);
+session_name('PDVSESSAO');
 session_start();
 // Se o PHP quebrar (ex.: extensão faltando), devolve o erro real em vez de uma tela vazia
 register_shutdown_function(function () {
@@ -33,10 +55,28 @@ $in = array_merge($_GET, $_POST, $in);
 function ok($d = []) { echo json_encode(['ok' => true] + (is_array($d) ? $d : ['dados' => $d]), JSON_UNESCAPED_UNICODE); exit; }
 function erro(string $m, int $code = 400) { http_response_code($code); echo json_encode(['ok' => false, 'erro' => $m], JSON_UNESCAPED_UNICODE); exit; }
 function usuario(): array { if (empty($_SESSION['u'])) erro('Faça login novamente.', 401); return $_SESSION['u']; }
+// Senha errada 5 vezes seguidas: trava novas tentativas por 5 minutos (evita adivinhar a senha)
+const PIN_TENTATIVAS = 5, PIN_ESPERA = 300;
+function pinChecarBloqueio(): void {
+  $ate = (int)cfg('pin_bloqueio_ate', '0');
+  if ($ate > time()) erro('Muitas senhas erradas. Aguarde ' . max(1, (int)ceil(($ate - time()) / 60)) . ' minuto(s) e tente de novo.', 429);
+}
+function pinErrou(string $onde): void {
+  $n = (int)cfg('pin_falhas', '0') + 1;
+  logar($_SESSION['u']['nome'] ?? '-', 'senha_errada', $onde . ' (tentativa ' . $n . ')');
+  if ($n >= PIN_TENTATIVAS) { cfgSet(['pin_falhas' => '0', 'pin_bloqueio_ate' => (string)(time() + PIN_ESPERA)]); logar('-', 'senha_bloqueada', $onde . ': ' . PIN_TENTATIVAS . ' senhas erradas, travado por 5 min'); }
+  else cfgSet(['pin_falhas' => (string)$n]);
+}
+function pinAcertou(): void { if (cfg('pin_falhas', '0') !== '0') cfgSet(['pin_falhas' => '0']); }
 function gerente(?string $pin = null): array {
   $u = usuario();
   if ($u['perfil'] === 'gerente') return $u;
-  if ($pin) foreach (q("SELECT * FROM usuarios WHERE perfil='gerente' AND ativo=1") as $g) if (password_verify($pin, $g['pin'])) return $g;
+  if ($pin) {
+    pinChecarBloqueio();
+    foreach (q("SELECT * FROM usuarios WHERE perfil='gerente' AND ativo=1") as $g) if (password_verify($pin, $g['pin'])) { pinAcertou(); return $g; }
+    pinErrou('senha do gerente');
+    erro('Senha do gerente incorreta.', 403);
+  }
   erro('Precisa da senha do gerente.', 403);
 }
 
@@ -57,9 +97,12 @@ try {
     ok(['configurado' => cfg('configurado') === '1', 'usuario' => $_SESSION['u'] ?? null, 'ambiente' => ambiente(),
         'empresa' => cfg('emp_fantasia') ?: cfg('emp_razao'), 'biblioteca' => bibliotecaInstalada(), 'config' => (!empty($_SESSION['u']) || cfg('configurado') !== '1') ? configPublica() : ['emp_fantasia' => cfg('emp_fantasia'), 'emp_razao' => cfg('emp_razao'), 'ambiente' => ambiente()]]);
   case 'login':
+    pinChecarBloqueio();
     foreach (q('SELECT * FROM usuarios WHERE ativo=1') as $u) if (password_verify((string)($in['pin'] ?? ''), $u['pin'])) {
+      session_regenerate_id(true); pinAcertou();
       $_SESSION['u'] = ['id' => $u['id'], 'nome' => $u['nome'], 'perfil' => $u['perfil']]; logar($u['nome'], 'login'); licEvento('Entrou no sistema', $u['nome']); ok(['usuario' => $_SESSION['u']]);
     }
+    pinErrou('login');
     erro('Senha incorreta.');
   case 'sair': session_destroy(); ok();
   case 'config_salvar':
@@ -126,10 +169,14 @@ try {
     if (($d['tipo'] ?? '') === 'servico') { $d['estoque'] = $d['estoque'] ?? 0; $d['unidade'] = $d['unidade'] ?: 'UN'; }
     if ($d['codigo'] && qv('SELECT id FROM produtos WHERE codigo=? AND ativo=1 AND id<>?', [$d['codigo'], (int)($in['id'] ?? 0)])) erro('Já existe um produto com esse código de barras.');
     $d['atualizado'] = agora();
+    $antes = !empty($in['id']) ? q1('SELECT nome,preco,custo,estoque FROM produtos WHERE id=?', [(int)$in['id']]) : null;
     if (!empty($in['id'])) { $set = implode(',', array_map(fn($k) => "$k=?", array_keys($d))); ex("UPDATE produtos SET $set WHERE id=?", [...array_values($d), $in['id']]); $id = (int)$in['id']; }
     else { $id = ex('INSERT INTO produtos (' . implode(',', array_keys($d)) . ') VALUES (' . rtrim(str_repeat('?,', count($d)), ',') . ')', array_values($d)); }
-    logar($u['nome'], 'produto_salvar', (string)$id); ok(['id' => $id]);
-  case 'produto_excluir': gerente($in['pin'] ?? null); ex('UPDATE produtos SET ativo=0 WHERE id=?', [$in['id']]); ok();
+    $mud = [];
+    if ($antes) foreach (['preco' => 'preço', 'custo' => 'custo', 'estoque' => 'estoque'] as $k => $rot) if ($d[$k] !== null && abs((float)$antes[$k] - (float)$d[$k]) > 0.0001) $mud[] = "$rot " . num2($antes[$k]) . ' → ' . num2($d[$k]);
+    logar($u['nome'], $antes ? ($mud ? 'produto_alterado' : 'produto_salvar') : 'produto_novo', ($d['nome'] ?? '') . ($mud ? ': ' . implode(', ', $mud) : ''));
+    ok(['id' => $id]);
+  case 'produto_excluir': $g = gerente($in['pin'] ?? null); ex('UPDATE produtos SET ativo=0 WHERE id=?', [$in['id']]); logar($g['nome'], 'produto_excluido', (string)qv('SELECT nome FROM produtos WHERE id=?', [$in['id']])); ok();
   case 'produtos_importar': gerente(); ok(importarCSV((string)$in['csv']));
 
   // ---------------- Entrada de notas do fornecedor (XML) ----------------
@@ -151,7 +198,9 @@ try {
   case 'caixa_mov':
     $u = ($in['tipo'] ?? '') === 'sangria' ? gerente($in['pin'] ?? null) : usuario();
     $cx = qv("SELECT id FROM caixas WHERE status='aberto'"); if (!$cx) erro('Abra o caixa primeiro.');
-    ex('INSERT INTO caixa_mov (caixa_id,data,tipo,valor,obs,operador) VALUES (?,?,?,?,?,?)', [$cx, agora(), $in['tipo'], abs((float)$in['valor']), $in['obs'] ?? '', $u['nome']]);
+    $tipo = ($in['tipo'] ?? '') === 'sangria' ? 'sangria' : 'suprimento';
+    ex('INSERT INTO caixa_mov (caixa_id,data,tipo,valor,obs,operador) VALUES (?,?,?,?,?,?)', [$cx, agora(), $tipo, abs((float)$in['valor']), $in['obs'] ?? '', $u['nome']]);
+    logar(($_SESSION['u']['nome'] ?? $u['nome']) . ($u['nome'] !== ($_SESSION['u']['nome'] ?? '') ? ' (autorizado por ' . $u['nome'] . ')' : ''), $tipo, 'R$ ' . num2(abs((float)$in['valor'])) . (($in['obs'] ?? '') !== '' ? ' · ' . $in['obs'] : ''));
     ok();
   case 'caixa_fechar':
     $u = usuario(); $cx = q1("SELECT * FROM caixas WHERE status='aberto'"); if (!$cx) erro('Nenhum caixa aberto.');
@@ -162,6 +211,20 @@ try {
 
   // ---------------- Vendas ----------------
   case 'venda_finalizar': $u = usuario(); ok(finalizarVenda($in, $u));
+  // Item removido / venda limpa antes de finalizar: operador precisa da senha do gerente e fica registrado
+  case 'caixa_ocorrencia':
+    $u = usuario();
+    $tipo = in_array($in['tipo'] ?? '', ['item_removido', 'venda_limpa'], true) ? $in['tipo'] : erro('Ocorrência inválida.');
+    $g = gerente($in['pin'] ?? null);
+    logar($u['nome'] . ($g['nome'] !== $u['nome'] ? ' (autorizado por ' . $g['nome'] . ')' : ''), $tipo, mb_substr((string)($in['detalhe'] ?? ''), 0, 300));
+    ok();
+  case 'auditoria':
+    gerente();
+    $w = ['1=1']; $p = [];
+    if (!empty($in['de'])) { $w[] = 'data >= ?'; $p[] = $in['de'] . ' 00:00:00'; }
+    if (!empty($in['ate'])) { $w[] = 'data <= ?'; $p[] = $in['ate'] . ' 23:59:59'; }
+    if (!empty($in['tipo'])) { $w[] = 'acao IN (' . implode(',', array_fill(0, count((array)$in['tipo']), '?')) . ')'; $p = [...$p, ...(array)$in['tipo']]; }
+    ok(['lista' => q('SELECT * FROM log WHERE ' . implode(' AND ', $w) . ' ORDER BY id DESC LIMIT 1000', $p)]);
   case 'venda_reemitir':
     usuario(); $v = q1('SELECT * FROM vendas WHERE id=?', [$in['id']]);
     if (!$v || $v['nfce_status'] !== 'rejeitada') erro('Esta venda não precisa ser reemitida.');

@@ -34,3 +34,10 @@ licencas/   servidor de licenças (Apps Script + Planilha Google)
 - O app não pede chave: abre junto com o Windows e trava se você bloquear (em até 10 minutos) ou se a vigência acabar (vale mesmo sem internet).
   Sem internet ele continua funcionando por até 30 dias (para ninguém escapar do bloqueio desligando a internet).
 - Toda mudança na pasta `app/` gera uma versão nova do instalador automaticamente.
+
+## Segurança e antifraude
+- **App do caixa:** só aceita comandos do próprio PDV (bloqueia outros sites, outros programas e DNS rebinding), sessão com cookie protegido, política de conteúdo (CSP) contra scripts injetados, senha travada por 5 min após 5 erros.
+- **Caixa:** preço sempre do cadastro, etiqueta de balança conferida com peso × preço, formas de pagamento fixas. Desconto, tirar item, cancelar venda, sangria e fiado acima do limite pedem a senha do gerente e ficam na tela **Auditoria** com quem fez e quem autorizou (também alteração de preço/estoque e senhas erradas).
+- **Licença:** vigência vale mesmo sem internet; atrasar o relógio do PC trava o sistema (confere com o horário do servidor).
+- **Servidor de licenças:** texto vindo de fora nunca vira fórmula na planilha, limite de pedidos por hora, área restrita trava após 8 senhas erradas, comparação de token em tempo constante.
+- **Site:** cabeçalhos de segurança (CSP, anti-iframe, HSTS).

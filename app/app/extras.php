@@ -171,7 +171,12 @@ function finalizarVenda(array $in, array $u): array {
     $preco = (float)$p['preco'];
     if ($p['promo_qtd'] && $qtd >= (float)$p['promo_qtd'] && $p['promo_preco']) $preco = (float)$p['promo_preco'];
     $tot = round($qtd * $preco, 2);
-    if (!empty($i['total_etiqueta'])) { $tot = round((float)$i['total_etiqueta'], 2); $preco = round($tot / $qtd, 4); } // valor exato impresso pela balança
+    if (!empty($i['total_etiqueta'])) { // valor exato impresso pela etiqueta da balança
+      $et = round((float)$i['total_etiqueta'], 2);
+      // antifraude: a etiqueta só vale se bater com peso × preço do cadastro (tolerância de arredondamento da balança)
+      if (abs($et - $tot) <= max(0.10, $tot * 0.02)) { $tot = $et; $preco = round($tot / $qtd, 4); }
+      else logar($u['nome'], 'etiqueta_divergente', $p['nome'] . ': etiqueta R$ ' . num2($et) . ', cadastro R$ ' . num2($tot) . ' — usado o valor do cadastro');
+    }
     $itens[] = ['produto_id' => $p['id'], 'codigo' => $p['codigo'] ?: $p['id'], 'nome' => $p['nome'], 'unidade' => $p['unidade'], 'qtd' => $qtd, 'preco' => $preco, 'total' => $tot,
       'desconto' => 0, 'custo' => (float)$p['custo'], 'ncm' => $p['ncm'], 'cfop' => $p['cfop'], 'csosn' => $p['csosn'], 'origem' => $p['origem'], 'cest' => $p['cest'], 'trib_aprox' => (float)$p['trib_aprox'],
       'tipo' => ($p['tipo'] ?? 'produto') === 'servico' ? 'servico' : 'produto', 'ctribnac' => $p['ctribnac'] ?? '', 'nbs' => $p['nbs'] ?? ''];
@@ -182,7 +187,7 @@ function finalizarVenda(array $in, array $u): array {
   if ($temProd && !emiteNFCe()) throw new Exception('Esta empresa está configurada para emitir só nota de SERVIÇO (NFS-e). Cadastre o item como serviço ou mude o tipo de emissão em Configurações.');
   if ($temServ && !emiteNFSe()) throw new Exception('Esta empresa está configurada para emitir só nota de PRODUTO (NFC-e). Mude o tipo de emissão em Configurações para vender serviços.');
   $desc = round(max(0, (float)($in['desconto'] ?? 0)), 2);
-  if ($desc > 0 && $u['perfil'] !== 'gerente') gerente($in['pin'] ?? null);
+  $autDesc = $desc > 0 && $u['perfil'] !== 'gerente' ? gerente($in['pin'] ?? null) : $u;
   if ($desc >= $sub) throw new Exception('Desconto maior que o total.');
   // rateio do desconto entre os itens (exigido pela NFC-e)
   $rest = $desc; foreach ($itens as $k => $it) { $d = $k === count($itens) - 1 ? $rest : round($desc * $it['total'] / $sub, 2); $itens[$k]['desconto'] = $d; $rest = round($rest - $d, 2); }
@@ -190,6 +195,7 @@ function finalizarVenda(array $in, array $u): array {
   $pags = []; $soma = 0; $din = 0;
   foreach ($in['pagamentos'] ?? [] as $p) {
     $val = round((float)$p['valor'], 2); if ($val <= 0) continue;
+    if (!in_array($p['forma'] ?? '', ['dinheiro', 'pix', 'debito', 'credito', 'fiado'], true)) throw new Exception('Forma de pagamento inválida.');
     $pags[] = ['forma' => $p['forma'], 'valor' => $val, 'integrado' => !empty($p['integrado']) ? 1 : 0, 'bandeira' => $p['bandeira'] ?? null, 'nsu' => $p['nsu'] ?? null,
       'autorizacao' => $p['autorizacao'] ?? null, 'cnpj_cred' => $p['cnpj_cred'] ?? (in_array($p['forma'], ['credito', 'debito', 'pix']) ? cfg('cnpj_credenciadora') : null)];
     $soma += $val; if ($p['forma'] === 'dinheiro') $din += $val;
@@ -203,12 +209,17 @@ function finalizarVenda(array $in, array $u): array {
   $cli = null;
   if ($fiado > 0) {
     $cli = q1('SELECT * FROM clientes WHERE id=?', [(int)($in['cliente_id'] ?? 0)]); if (!$cli) throw new Exception('Escolha o cliente do fiado.');
-    if ($cli['limite'] > 0 && $cli['saldo'] + $fiado > $cli['limite'] + 0.001 && $u['perfil'] !== 'gerente') { gerente($in['pin'] ?? null); }
+    if ($cli['limite'] > 0 && $cli['saldo'] + $fiado > $cli['limite'] + 0.001) {
+      $autF = $u['perfil'] !== 'gerente' ? gerente($in['pin'] ?? null) : $u;
+      $logFiado = [$u['nome'] . ($autF['nome'] !== $u['nome'] ? ' (autorizado por ' . $autF['nome'] . ')' : ''), 'fiado_acima_limite', $cli['nome'] . ': R$ ' . num2($fiado) . ' (limite R$ ' . num2($cli['limite']) . ')'];
+    }
   }
 
   db()->beginTransaction();
   $vid = ex('INSERT INTO vendas (data,caixa_id,operador,subtotal,desconto,total,troco,cpf,cliente_id,nfce_status) VALUES (?,?,?,?,?,?,?,?,?,?)',
     [agora(), $cx['id'], $u['nome'], $sub, $desc, $total, $troco, soDigitos($in['cpf'] ?? '') ?: null, $cli['id'] ?? null, 'pendente']);
+  if ($desc > 0) logar($u['nome'] . ($autDesc['nome'] !== $u['nome'] ? ' (autorizado por ' . $autDesc['nome'] . ')' : ''), 'desconto', "venda $vid: R$ " . num2($desc) . ' de R$ ' . num2($sub) . ' (' . number_format($desc / $sub * 100, 1, ',', '') . '%)');
+  if (!empty($logFiado)) { $logFiado[2] = "venda $vid · " . $logFiado[2]; logar(...$logFiado); }
   $si = db()->prepare('INSERT INTO venda_itens (venda_id,produto_id,codigo,nome,unidade,qtd,preco,desconto,total,custo,ncm,cfop,csosn,origem,cest,trib_aprox,tipo,ctribnac,nbs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
   $se = db()->prepare('UPDATE produtos SET estoque=estoque-? WHERE id=?');
   foreach ($itens as $it) {

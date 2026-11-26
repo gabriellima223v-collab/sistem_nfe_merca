@@ -28,7 +28,7 @@ function doPost(e) {
   if (!d.acao && d.type && d.data) return saida_(webhookStone_(d)); // aviso da Stone/Pagar.me
   return saida_(rotear_(Object.assign({}, (e && e.parameter) || {}, d)));
 }
-function saida_(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+function saida_(o) { if (o && typeof o === 'object') o.ts = Date.now(); return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
 
 function rotear_(p) {
   try {
@@ -97,9 +97,11 @@ function acharChave_(chave) {
   chave = String(chave || '').trim().toUpperCase();
   return linhas_().find(o => String(o.Chave).toUpperCase() === chave) || null;
 }
+// Antifraude: texto que começa com = + - @ viraria fórmula na planilha (ex.: =IMPORTXML para vazar dados)
+function limpo_(v) { if (typeof v !== 'string') return v; v = v.replace(/[\u0000-\u001f]/g, ' ').trim(); return /^[=+\-@]/.test(v) ? "'" + v : v; }
 function gravar_(linha, campos) {
   const sh = aba_();
-  Object.keys(campos).forEach(c => { const col = COLS.indexOf(c); if (col < 0) return; const r = sh.getRange(linha, col + 1); if (c === 'Vencimento') r.setNumberFormat('@'); r.setValue(campos[c]); });
+  Object.keys(campos).forEach(c => { const col = COLS.indexOf(c); if (col < 0) return; const r = sh.getRange(linha, col + 1); if (c === 'Vencimento') r.setNumberFormat('@'); r.setValue(limpo_(campos[c])); });
 }
 function agora_() { return Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyy-MM-dd HH:mm'); }
 
@@ -131,21 +133,28 @@ function solicitar_(p) {
   const trava = LockService.getScriptLock(); trava.waitLock(10000);
   try {
     const maq = String(p.maquina || '').trim();
-    if (!maq) return { ok: false, status: 'invalida', erro: 'Computador não identificado.' };
+    if (!/^[A-F0-9]{24}$/.test(maq)) return { ok: false, status: 'invalida', erro: 'Computador não identificado.' };
     const contato = PROPS.getProperty('CONTATO') || '';
     const d = p.dados || {};
-    const ja = linhas_().find(o => String(o.Maquina) === maq);
+    const todas = linhas_();
+    const ja = todas.find(o => String(o.Maquina) === maq);
     if (ja) {   // este computador já pediu antes: devolve a situação atual
       gravar_(ja._linha, { 'Ultimo contato': agora_(), Versao: p.versao || '' });
       return Object.assign(validarLinha_(ja), { ok: true, chave: ja.Chave, cliente: ja.Cliente, contato: contato });
     }
+    // antiataque: no máximo 30 pedidos esperando e 15 pedidos novos por hora
+    if (todas.filter(o => o.Status === 'Pendente').length >= 30) return { ok: false, erro: 'Muitos pedidos aguardando. Tente mais tarde.' };
+    const cache = CacheService.getScriptCache(), hora = 'ped_' + Utilities.formatDate(new Date(), 'America/Sao_Paulo', 'yyyyMMddHH');
+    const nHora = Number(cache.get(hora) || 0); if (nHora >= 15) return { ok: false, erro: 'Muitos pedidos agora. Tente daqui a pouco.' };
+    cache.put(hora, String(nHora + 1), 3700);
+    if (String(d.cnpj || '').replace(/\D/g, '').length !== 14) return { ok: false, erro: 'CNPJ inválido no cadastro.' };
     let chave; do { chave = novaChave_(); } while (acharChave_(chave));
     const cidade = [d.municipio, d.uf].filter(Boolean).join('/');
     const emissao = { nfce: 'NFC-e (produtos)', nfse: 'NFS-e (serviços)', ambos: 'NFC-e e NFS-e' }[d.emissao] || '';
     const campos = { Chave: chave, Cliente: String(d.fantasia || d.razao || 'Sem nome').slice(0, 80), Telefone: String(d.fone || '').slice(0, 30), CNPJ: fmtCnpj_(d.cnpj), Status: 'Pendente',
       Maquina: maq, 'Nome do PC': p.nome_pc || '', Criada: agora_(), 'Ultimo contato': agora_(), Versao: p.versao || '',
       Obs: [d.razao && d.razao !== d.fantasia ? d.razao : '', cidade, emissao].filter(Boolean).join(' · ').slice(0, 200) };
-    aba_().appendRow(COLS.map(c => campos[c] ?? ''));
+    aba_().appendRow(COLS.map(c => limpo_(campos[c] ?? '')));
     registrar_(chave, campos.Cliente, 'Pediu acesso (cadastro feito)', '', p.nome_pc);
     return { ok: true, status: 'pendente', chave: chave, cliente: campos.Cliente, contato: contato };
   } finally { trava.releaseLock(); }
@@ -199,7 +208,7 @@ function abaAcessos_() {
   return sh;
 }
 function registrar_(chave, cliente, evento, usuario, pc) {
-  try { abaAcessos_().appendRow([agora_(), chave, cliente || '', evento, usuario || '', pc || '']); } catch (e) {}
+  try { abaAcessos_().appendRow([agora_(), chave, cliente || '', evento, usuario || '', pc || ''].map(v => limpo_(String(v).slice(0, 200)))); } catch (e) {}
 }
 // O app avisa quando alguém entra (login), abre o caixa etc.
 function evento_(p) {
@@ -219,18 +228,22 @@ function acessos_(chave) {
 function login_(senha) {
   const certa = PROPS.getProperty('ADMIN_SENHA');
   if (!certa) return { ok: false, erro: 'Rode a função configurarSenha no Apps Script primeiro.' };
-  Utilities.sleep(400); // dificulta tentativa e erro
-  if (String(senha || '') !== certa) return { ok: false, erro: 'Senha incorreta.' };
+  const cache = CacheService.getScriptCache(), erros = Number(cache.get('adm_erros') || 0);
+  if (erros >= 8) return { ok: false, erro: 'Muitas tentativas erradas. A área restrita fica travada por 15 minutos.' };
+  Utilities.sleep(600); // dificulta tentativa e erro
+  if (!iguais_(String(senha || ''), certa)) { cache.put('adm_erros', String(erros + 1), 900); return { ok: false, erro: 'Senha incorreta.' }; }
+  cache.remove('adm_erros');
   const ts = String(Date.now());
   return { ok: true, token: ts + '.' + assinar_(ts) };
 }
+function iguais_(a, b) { if (a.length !== b.length) return false; let x = 0; for (let i = 0; i < a.length; i++) x |= a.charCodeAt(i) ^ b.charCodeAt(i); return x === 0; }
 function assinar_(t) {
   const b = Utilities.computeHmacSha256Signature(t + '|' + PROPS.getProperty('ADMIN_SENHA'), PROPS.getProperty('SEGREDO') || 'x');
   return Utilities.base64EncodeWebSafe(b);
 }
 function adm_(p) {
   const [ts, sig] = String(p.token || '').split('.');
-  if (!ts || !sig || sig !== assinar_(ts) || Date.now() - Number(ts) > 12 * 3600 * 1000) throw new Error('Sessão expirada. Entre de novo.');
+  if (!ts || !sig || !iguais_(sig, assinar_(ts)) || Date.now() - Number(ts) > 12 * 3600 * 1000) throw new Error('Sessão expirada. Entre de novo.');
 }
 function listar_() {
   return linhas_().map(o => { const c = Object.assign({}, o); delete c._linha; return c; }).reverse();
@@ -253,7 +266,7 @@ function salvar_(d) {
     }
     let chave; do { chave = novaChave_(); } while (acharChave_(chave));
     const sh = aba_();
-    const linha = COLS.map(c => ({ Chave: chave, Status: 'Ativa', Criada: agora_() })[c] ?? campos[c] ?? '');
+    const linha = COLS.map(c => limpo_(({ Chave: chave, Status: 'Ativa', Criada: agora_() })[c] ?? campos[c] ?? ''));
     sh.appendRow(linha);
     return { ok: true, chave: chave };
   } finally { trava.releaseLock(); }
