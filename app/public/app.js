@@ -115,7 +115,15 @@ const TELAS = [
 
 // ======================= Início =======================
 async function iniciar() {
-  try { const l = (await api('licenca_estado')).licenca; if (l.status !== 'ativa') return telaLicenca(l); } catch (e) { if (e.code === 402) return; }
+  let l = null;
+  try { l = (await api('licenca_estado')).licenca; } catch (e) { if (e.code === 402) return; }
+  // Primeiro o cliente faz o cadastro da empresa; o pedido de acesso vai no final
+  if (l && l.status !== 'ativa') {
+    let est = null; try { est = await api('estado'); } catch (e) {}
+    if (est && !est.configurado && ['sem_licenca', 'pendente'].includes(l.status)) { S.est = est; S.cfg = est.config; return assistente(); }
+    if (l.status === 'sem_licenca' && !l.msg) return enviarPedido();
+    return telaLicenca(l);
+  }
   try { S.est = await api('estado'); } catch (e) { $('#cheia').innerHTML = `<div class="tela-cheia"><div class="login"><h2>Não foi possível iniciar</h2><p>${esc(e.message)}</p></div></div>`; return; }
   S.cfg = S.est.config;
   if (!S.est.configurado) return assistente();
@@ -183,32 +191,51 @@ setInterval(async () => {
   try { const r = await api('contingencia_transmitir'); if (r.enviadas) { toast(`${r.enviadas} nota(s) de contingência autorizadas pela SEFAZ.`, 'ok'); atualizarStatus(); } } catch (e) {}
 }, 60000);
 
-// ======================= Licença (ativação / bloqueio) =======================
+// ======================= Acesso (pedido / liberação / bloqueio) =======================
+let esperaLib = null;
+async function enviarPedido() {
+  telaLicenca({ status: 'enviando' });
+  try { const r = await api('licenca_solicitar'); if (r.licenca.status === 'ativa') { $('#cheia').innerHTML = ''; return iniciar(); } telaLicenca(r.licenca); }
+  catch (e) { telaLicenca({ status: 'sem_licenca', msg: e.message, erroEnvio: true }); }
+}
 function telaLicenca(l) {
+  clearInterval(esperaLib);
   $('#app').classList.add('hide'); $$('#modais .fundo').forEach(m => m.remove());
   const tel = String(l.contato || '').replace(/\D/g, '');
   const contato = l.contato ? `<p class="ajuda" style="margin-top:14px">Suporte: <b>${esc(l.contato)}</b>${tel.length >= 10 ? ` · <a href="https://wa.me/55${tel}" target="_blank">chamar no WhatsApp</a>` : ''}</p>` : '';
-  const ativar = l.status === 'sem_licenca' || l.status === 'invalida';
-  const tit = ativar ? 'Ativar o PDV' : l.status === 'bloqueada' ? 'Acesso bloqueado' : 'Conecte à internet';
-  const txt = ativar ? (l.status === 'invalida' ? esc(l.msg || 'Chave inválida.') + ' Digite uma chave válida.' : 'Digite a chave de acesso que você recebeu. É só na primeira vez.')
-    : l.status === 'bloqueada' ? 'O uso deste sistema foi suspenso. Entre em contato com o suporte para liberar.'
-    : 'Faz muitos dias que o sistema não consegue confirmar a licença. Conecte este computador à internet e clique em Verificar.';
-  $('#cheia').innerHTML = `<div class="tela-cheia"><div class="login" style="width:min(440px,100%)">
-    <div style="color:${ativar ? 'var(--verde)' : 'var(--tomate)'}"><svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>${ativar ? '' : '<path d="M12 14v3"/>'}</svg></div>
-    <h2>${tit}</h2><p style="color:var(--mut)">${txt}</p>
-    ${ativar ? `<input id="licK" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19" style="text-align:center;font-size:20px;letter-spacing:2px;text-transform:uppercase;margin:6px 0 12px"><button class="btn pri lg" id="licB" style="width:100%">Ativar</button>`
-      : `<button class="btn pri lg" id="licV" style="width:100%">Verificar de novo</button>`}${contato}</div></div>`;
-  if (ativar) {
-    const k = $('#licK');
-    k.oninput = () => { let v = k.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 16); k.value = v.replace(/(.{4})(?=.)/g, '$1-'); };
-    const go = async () => { $('#licB').disabled = true; try { const r = await api('licenca_ativar', { chave: k.value }); if (r.licenca.status === 'ativa') { toast('PDV ativado!', 'ok'); $('#cheia').innerHTML = ''; iniciar(); } } catch (e) { toast(e.message, 'er'); } if ($('#licB')) $('#licB').disabled = false; };
-    $('#licB').onclick = go; k.onkeydown = e => { if (e.key === 'Enter') go(); }; k.focus();
-  } else {
-    $('#licV').onclick = async () => { try { const r = await api('licenca_estado', { forcar: 1 }); if (r.licenca.status === 'ativa') { $('#cheia').innerHTML = ''; iniciar(); } else { toast('Ainda bloqueado.', 'er'); telaLicenca(r.licenca); } } catch (e) { toast(e.message, 'er'); } };
-  }
+  const cnpj = String(l.cnpj || '').replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, '$1.$2.$3/$4-$5');
+  const empresa = l.empresa ? `<div class="lic-emp"><b>${esc(l.empresa)}</b>${cnpj ? `<span>CNPJ ${esc(cnpj)}</span>` : ''}</div>` : '';
+  const ic = {
+    relogio: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+    cadeado: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M12 14v3"/>',
+    envio: '<path d="M22 2 11 13"/><path d="M22 2 15 22l-4-9-9-4 20-7z"/>',
+    calendario: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 11h18"/>',
+    wifi: '<path d="M5 12.5a10 10 0 0 1 14 0M8.5 16a5 5 0 0 1 7 0M2 9a15 15 0 0 1 20 0"/><circle cx="12" cy="19.5" r="1"/>'
+  };
+  const T = {
+    enviando: ['envio', 'var(--verde)', 'Enviando o cadastro…', 'Só um instante.', ''],
+    pendente: ['relogio', 'var(--verde)', 'Cadastro enviado!', 'Agora é só aguardar a liberação do acesso. Assim que for liberado, o sistema abre sozinho — pode deixar esta tela aberta.',
+      `<div class="lic-espera"><i></i>Aguardando liberação</div><button class="btn lg" id="licV" style="width:100%">Verificar agora</button>`],
+    sem_licenca: ['envio', 'var(--verde)', l.erroEnvio ? 'Não foi possível enviar' : 'Pedir acesso de novo', esc(l.msg || 'Envie o pedido de acesso.'), `<button class="btn pri lg" id="licE" style="width:100%">Enviar pedido de acesso</button>`],
+    bloqueada: ['cadeado', 'var(--tomate)', 'Acesso bloqueado', 'O uso deste sistema foi suspenso. Entre em contato com o suporte para liberar.', `<button class="btn pri lg" id="licV" style="width:100%">Verificar de novo</button>`],
+    vencida: ['calendario', 'var(--ambar)', 'Acesso vencido', esc(l.msg || 'A vigência do acesso terminou. Entre em contato para renovar.'), `<button class="btn pri lg" id="licV" style="width:100%">Já renovei, verificar</button>`],
+    offline_demais: ['wifi', 'var(--tomate)', 'Conecte à internet', 'Faz muitos dias que o sistema não consegue confirmar o acesso. Conecte este computador à internet e clique em Verificar.', `<button class="btn pri lg" id="licV" style="width:100%">Verificar de novo</button>`],
+  }[l.status] || ['cadeado', 'var(--tomate)', 'Acesso', esc(l.msg || ''), `<button class="btn pri lg" id="licV" style="width:100%">Verificar de novo</button>`];
+  $('#cheia').innerHTML = `<div class="tela-cheia"><div class="login" style="width:min(460px,100%)">
+    <div style="color:${T[1]}"><svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ic[T[0]]}</svg></div>
+    <h2>${T[2]}</h2>${empresa}<p style="color:var(--mut)">${T[3]}</p>${T[4]}${contato}</div></div>`;
+  const conferir = async (avisar) => {
+    try { const r = await api('licenca_estado', { forcar: 1 }); const n = r.licenca;
+      if (n.status === 'ativa') { clearInterval(esperaLib); toast('Acesso liberado!', 'ok'); $('#cheia').innerHTML = ''; return iniciar(); }
+      if (n.status !== l.status || avisar) { if (avisar && n.status === l.status) toast(l.status === 'pendente' ? 'Ainda aguardando liberação.' : 'Ainda sem acesso.', 'er'); if (n.status !== l.status) telaLicenca(n); }
+    } catch (e) { if (avisar) toast(e.message, 'er'); }
+  };
+  if ($('#licV')) $('#licV').onclick = () => conferir(true);
+  if ($('#licE')) $('#licE').onclick = enviarPedido;
+  if (l.status === 'pendente') esperaLib = setInterval(() => conferir(false), 20000);
 }
 // Confere a licença de tempos em tempos (o bloqueio vale em até 10 minutos)
-setInterval(async () => { try { const l = (await api('licenca_estado')).licenca; if (l.status !== 'ativa') telaLicenca(l); } catch (e) {} }, 5 * 60000);
+setInterval(async () => { if (!S.u) return; try { const l = (await api('licenca_estado')).licenca; if (l.status !== 'ativa') telaLicenca(l); } catch (e) {} }, 5 * 60000);
 
 // ======================= Assistente de configuração =======================
 function assistente(passo = 1, dados = {}) {
@@ -255,9 +282,9 @@ function assistente(passo = 1, dados = {}) {
     <div id="wSt" class="${c.maquininha === 'stone' ? '' : 'hide'}">${campo('stone_sk', 'Secret Key da loja (Stone / Pagar.me)', 'password')}${campo('stone_parceiro', 'Seu ID de parceiro Stone')}${campo('stone_serial', 'Número de série da maquininha')}</div>
     <div id="wMp" class="${c.maquininha === 'mp' ? '' : 'hide'}">${campo('mp_token', 'Access Token do Mercado Pago (produção)', 'password')}
       <p class="ajuda">No site mercadopago.com.br/developers → Suas integrações → Criar aplicação → Credenciais de produção. Depois você escolhe a maquininha em Configurações.</p></div>
-    <p class="ajuda">A senha inicial do gerente é <b>1234</b>. Troque em Configurações → Usuários depois de entrar.</p>`;
+    <p class="ajuda">Ao concluir, o cadastro é enviado para liberação do acesso. A senha inicial do gerente é <b>1234</b> — troque em Configurações → Usuários depois de entrar.</p>`;
   $('#cheia').innerHTML = `<div class="tela-cheia"><div class="wiz">${topo}<div class="corpo">${corpo}</div>
-    ${passo ? `<div class="linha" style="padding:0 26px 22px;justify-content:space-between"><button class="btn ${passo === 1 ? 'hide' : ''}" id="wVoltar">Voltar</button><button class="btn pri lg" id="wProx">${passo === 4 ? 'Concluir e entrar' : 'Continuar'}</button></div>` : ''}</div></div>`;
+    ${passo ? `<div class="linha" style="padding:0 26px 22px;justify-content:space-between"><button class="btn ${passo === 1 ? 'hide' : ''}" id="wVoltar">Voltar</button><button class="btn pri lg" id="wProx">${passo === 4 ? 'Concluir cadastro' : 'Continuar'}</button></div>` : ''}</div></div>`;
   $$('#cheia select[data-k]').forEach(s => { if (c[s.dataset.k]) s.value = c[s.dataset.k]; });
   const coletar = () => { $$('#cheia [data-k]').forEach(i => { dados[i.dataset.k] = i.value.trim(); }); return dados; };
   $('#wVoltar').onclick = () => assistente(passo - 1, coletar());

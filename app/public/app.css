@@ -197,3 +197,10 @@ tr.cl:hover td{background:#f7faf7;cursor:pointer}
 .hbar{display:grid;grid-template-columns:110px 1fr 100px;gap:10px;align-items:center;padding:5px 0;font-size:14px}
 .hbar .t{background:#eef2ed;border-radius:6px;height:14px;overflow:hidden}
 .hbar .t div{height:100%;background:var(--verde2);border-radius:6px}
+
+/* Tela de acesso (pedido / aguardando liberação) */
+.lic-emp{display:flex;flex-direction:column;gap:2px;background:var(--bg);border-radius:12px;padding:10px 14px;margin:4px 0 10px}
+.lic-emp span{font-size:13px;color:var(--mut)}
+.lic-espera{display:flex;align-items:center;justify-content:center;gap:10px;font-weight:700;color:var(--verde);margin:4px 0 14px}
+.lic-espera i{width:12px;height:12px;border-radius:50%;background:var(--verde);animation:pulsa 1.4s ease-in-out infinite}
+@keyframes pulsa{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1.15)}}

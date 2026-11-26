@@ -30,7 +30,7 @@ licencas/   servidor de licenças (Apps Script + Planilha Google)
 2. Na Vercel: **Add New → Project → Import** este repositório → **Root Directory: `site`** → Deploy.
 
 ## Uso
-- Área restrita (canto superior direito do site): **Nova licença** gera a chave, **Bloquear/Desbloquear**, **Liberar troca de PC**, vencimento do plano e a aba **Entradas** (ativações, logins, abertura/fechamento de caixa, tentativas bloqueadas).
-- O app pede a chave só na primeira vez, abre junto com o Windows e só trava se você bloquear (em até 10 minutos).
+- O cliente instala, faz o cadastro da empresa e o pedido chega na área restrita (canto superior direito do site) como **Aguardando liberação**. **Autorizar** pede a data de vigência; depois dela o app trava sozinho até você **Renovar**. Também tem **Bloquear/Desbloquear**, **Recusar** e a aba **Entradas** (pedidos, autorizações, logins, abertura/fechamento de caixa, tentativas bloqueadas).
+- O app não pede chave: abre junto com o Windows e trava se você bloquear (em até 10 minutos) ou se a vigência acabar (vale mesmo sem internet).
   Sem internet ele continua funcionando por até 30 dias (para ninguém escapar do bloqueio desligando a internet).
 - Toda mudança na pasta `app/` gera uma versão nova do instalador automaticamente.

@@ -16,7 +16,8 @@ transmite as notas sozinho quando a conexão volta.
  PDV-Setup.exe e clique em Instalar. Não precisa de
  internet nem de senha de administrador. O sistema fica em C:\PDV,
  abre sozinho quando o Windows liga e cria o ícone na área de trabalho.
- Na primeira vez ele pede a CHAVE DE ACESSO (só uma vez).
+ Na primeira vez você faz o cadastro da empresa e o acesso é liberado
+ pelo suporte (não precisa digitar chave).
 
  Para ATUALIZAR: instale a versão nova por cima. Vendas, produtos e o
  certificado (C:\PDV\dados) são mantidos.
@@ -28,8 +29,7 @@ transmite as notas sozinho quando a conexão volta.
 --------------------------------------------------------------
 2) PRIMEIRA VEZ QUE ABRIR
 --------------------------------------------------------------
- 1. Digite a CHAVE DE ACESSO (só na primeira vez).
- 2. O assistente pede:
+ 1. O assistente pede:
     • CNPJ (clique em Buscar: o resto é preenchido sozinho) e a
       Inscrição Estadual;
     • o que a empresa vende: PRODUTOS (NFC-e), SERVIÇOS (NFS-e) ou OS DOIS;
@@ -41,6 +41,11 @@ transmite as notas sozinho quando a conexão volta.
       cada serviço — confirme com o contador.
     Comece em "Teste (homologação)": as notas vão para a SEFAZ mas não
     têm valor fiscal. Depois troque para "Produção" em Configurações.
+ 2. Ao clicar em "Concluir cadastro", o pedido de acesso é enviado.
+    A tela fica em "Aguardando liberação" e o sistema abre sozinho
+    assim que o acesso for liberado (o computador precisa de internet).
+    O acesso vale até a data combinada; depois dela o sistema trava
+    até ser renovado.
  3. Entre com a senha do gerente: 1234 (troque em Configurações >
     Usuários) e abra o caixa.
 

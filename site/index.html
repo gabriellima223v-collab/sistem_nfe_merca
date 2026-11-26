@@ -80,7 +80,13 @@ th{font-size:12px;color:var(--mut);text-align:left;padding:9px 10px;border-botto
 td{padding:10px;border-bottom:1px solid #eef1ec;vertical-align:middle}
 .scroll{overflow-x:auto}
 .chip{display:inline-block;border-radius:6px;padding:2px 8px;font-size:12px;font-weight:700;white-space:nowrap}
-.c-ok{background:var(--vcl);color:var(--verde)}.c-er{background:var(--tcl);color:var(--tomate)}.c-av{background:var(--acl);color:var(--ambar)}.c-in{background:#eef1ec;color:var(--mut)}
+.c-ok{background:var(--vcl);color:var(--verde)}.c-er{background:var(--tcl);color:var(--tomate)}.c-av{background:var(--acl);color:var(--ambar)}.c-in{background:#eef1ec;color:var(--mut)}.c-novo{background:#dff6ea;color:#0b7a4b;box-shadow:inset 0 0 0 1px #9fdcbc}
+.aviso{background:#e6f6ee;border:1px solid #9fdcbc;color:#0f3d27;border-radius:12px;padding:12px 16px;margin-bottom:14px}
+tr.novo td{background:#f4fbf7}
+.atalhos{display:flex;gap:8px;flex-wrap:wrap;margin:-4px 0 10px}
+#painel nav a .bdg{margin-left:auto;background:#3fd18a;color:#0b2a1b;border-radius:10px;padding:1px 8px;font-size:12px;font-weight:800;font-style:normal}
+#painel.mini nav a .bdg{position:absolute;margin:0 0 0 18px;transform:translateY(-10px)}
+.bdg.hide{display:none}
 .chave{font:600 14px ui-monospace,Consolas,monospace;letter-spacing:.5px;white-space:nowrap}
 .mut{color:var(--mut);font-size:13px}
 .acoesL{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
@@ -119,8 +125,8 @@ td{padding:10px;border-bottom:1px solid #eef1ec;vertical-align:middle}
   </section>
   <section class="passos">
     <div class="passo"><div class="n">1</div><h3>Baixe e instale</h3><p>Dois cliques no arquivo baixado e "Instalar". O ícone aparece na área de trabalho.</p></div>
-    <div class="passo"><div class="n">2</div><h3>Digite sua chave</h3><p>Só na primeira vez. Depois o sistema abre direto, junto com o Windows.</p></div>
-    <div class="passo"><div class="n">3</div><h3>Configure e venda</h3><p>Informe o CNPJ, o certificado A1 e o CSC. Em 5 minutos o caixa está emitindo nota.</p></div>
+    <div class="passo"><div class="n">2</div><h3>Faça o cadastro</h3><p>CNPJ, certificado A1 e o tipo de nota. No final o cadastro é enviado para liberação.</p></div>
+    <div class="passo"><div class="n">3</div><h3>Acesso liberado, é só vender</h3><p>Assim que o acesso for liberado o sistema abre sozinho. Depois abre direto, junto com o Windows.</p></div>
   </section>
   <section class="recursos">
     <div><b>NFC-e e contingência</b><span>Nota direto na SEFAZ e venda sem internet</span></div>
@@ -136,7 +142,7 @@ td{padding:10px;border-bottom:1px solid #eef1ec;vertical-align:middle}
   <aside>
     <div class="marca"><div class="logo"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.4"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg></div><b>Área restrita</b></div>
     <nav>
-      <a href="#" data-v="licencas" class="on"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M17 6l3 3M15 8l2 2"/></svg><span>Licenças</span></a>
+      <a href="#" data-v="licencas" class="on"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="15" r="4"/><path d="M10.8 12.2L20 3M17 6l3 3M15 8l2 2"/></svg><span>Clientes</span><em class="bdg hide"></em></a>
       <a href="#" data-v="entradas"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg><span>Entradas</span></a>
       <a href="#" data-v="config"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"/></svg><span>Configurações</span></a>
     </nav>
@@ -202,49 +208,73 @@ $$('#painel nav a').forEach(a => a.onclick = e => { e.preventDefault(); ir(a.dat
 function ir(v) { vista = v; $$('#painel nav a').forEach(a => a.classList.toggle('on', a.dataset.v === v)); $('#tela').innerHTML = '<p class="mut">Carregando…</p>'; ({ licencas: telaLicencas, entradas: telaEntradas, config: telaConfig })[v]().catch(e => { $('#tela').innerHTML = `<p class="mut">${esc(e.message)}</p>`; }); }
 
 const hojeISO = () => new Date().toLocaleDateString('sv-SE');
+const somaDias = n => { const d = new Date(); d.setDate(d.getDate() + n); return d.toLocaleDateString('sv-SE'); };
+const venc = l => String(l.Vencimento || '').slice(0, 10);
+const vencida = l => l.Status === 'Ativa' && venc(l) && venc(l) < hojeISO();
 function situacao(l) {
+  if (l.Status === 'Pendente') return '<span class="chip c-novo">Aguardando sua liberação</span>';
   if (l.Status === 'Bloqueada') return '<span class="chip c-er">Bloqueada</span>';
-  if (!l.Maquina) return '<span class="chip c-in">Aguardando ativar</span>';
+  if (vencida(l)) return '<span class="chip c-av">Vencida · travado</span>';
   const ult = l['Ultimo contato'] ? (Date.now() - new Date(String(l['Ultimo contato']).replace(' ', 'T'))) / 864e5 : 99;
-  return ult > 1 ? `<span class="chip c-av">Ativa · sem contato há ${Math.floor(ult)} dia(s)</span>` : '<span class="chip c-ok">Ativa · online</span>';
+  return ult > 1 ? `<span class="chip c-av">Liberado · sem contato há ${Math.floor(ult)} dia(s)</span>` : '<span class="chip c-ok">Liberado · online</span>';
 }
+function badgePendentes() {
+  const n = lista.filter(l => l.Status === 'Pendente').length, a = $('#painel nav a[data-v=licencas]');
+  let b = $('.bdg', a); if (!b) { b = document.createElement('em'); b.className = 'bdg'; a.append(b); }
+  b.textContent = n; b.classList.toggle('hide', !n);
+}
+let recarga = null;
 async function telaLicencas() {
-  lista = (await api('admin_listar')).lista;
-  const bloq = lista.filter(l => l.Status === 'Bloqueada').length, venc = lista.filter(l => l.Vencimento && String(l.Vencimento).slice(0, 10) < hojeISO() && l.Status !== 'Bloqueada').length;
-  $('#tela').innerHTML = `<div class="tt"><h1>Licenças</h1><input id="bus" placeholder="Buscar cliente ou chave" style="width:240px"><button class="btn pri" id="nova">+ Nova licença</button></div>
-    <div class="cards"><div class="card"><div class="r">Clientes</div><div class="v">${lista.length}</div></div><div class="card"><div class="r">Em uso</div><div class="v">${lista.filter(l => l.Maquina && l.Status !== 'Bloqueada').length}</div></div>
-    <div class="card"><div class="r">Bloqueadas</div><div class="v" style="color:var(--tomate)">${bloq}</div></div><div class="card"><div class="r">Vencidas (não bloqueadas)</div><div class="v" style="color:var(--ambar)">${venc}</div></div></div>
-    <div class="card scroll"><table><thead><tr><th>Cliente</th><th>Chave</th><th>Situação</th><th>Vencimento</th><th>Computador</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>`;
+  lista = (await api('admin_listar')).lista; badgePendentes();
+  const pend = lista.filter(l => l.Status === 'Pendente'), ativos = lista.filter(l => l.Status === 'Ativa' && !vencida(l));
+  $('#tela').innerHTML = `<div class="tt"><h1>Clientes</h1><input id="bus" placeholder="Buscar cliente, CNPJ ou cidade" style="width:260px"><select id="fil" style="width:auto"><option value="">Todos</option><option value="Pendente">Aguardando liberação</option><option value="Ativa">Liberados</option><option value="vencida">Vencidos</option><option value="Bloqueada">Bloqueados</option></select></div>
+    ${pend.length ? `<div class="aviso"><b>${pend.length} ${pend.length > 1 ? 'pedidos' : 'pedido'} de acesso</b> aguardando você. Confira os dados e clique em <b>Autorizar</b> para escolher até quando vale.</div>` : ''}
+    <div class="cards"><div class="card"><div class="r">Aguardando liberação</div><div class="v" style="color:var(--verde)">${pend.length}</div></div><div class="card"><div class="r">Liberados</div><div class="v">${ativos.length}</div></div>
+    <div class="card"><div class="r">Vencidos</div><div class="v" style="color:var(--ambar)">${lista.filter(vencida).length}</div></div><div class="card"><div class="r">Bloqueados</div><div class="v" style="color:var(--tomate)">${lista.filter(l => l.Status === 'Bloqueada').length}</div></div></div>
+    <div class="card scroll"><table><thead><tr><th>Cliente</th><th>Situação</th><th>Vigência</th><th>Computador</th><th></th></tr></thead><tbody id="tb"></tbody></table></div>
+    <p class="mut">O cliente instala o PDV, faz o cadastro da empresa e o pedido aparece aqui sozinho. A lista se atualiza a cada 30 segundos.</p>`;
   const desenha = () => {
-    const t = $('#bus').value.toLowerCase();
-    const l = lista.filter(x => !t || String(x.Cliente).toLowerCase().includes(t) || String(x.Chave).toLowerCase().includes(t));
-    $('#tb').innerHTML = l.map(x => { const v = String(x.Vencimento || '').slice(0, 10); const vencida = v && v < hojeISO();
-      return `<tr><td><b>${esc(x.Cliente)}</b><div class="mut">${esc(x.Telefone)}${x.CNPJ ? ' · ' + esc(x.CNPJ) : ''}</div></td><td class="chave">${esc(x.Chave)}</td><td>${situacao(x)}<div class="mut">último contato ${dataBR(x['Ultimo contato'])}</div></td>
-      <td>${v ? `<span class="${vencida ? 'chip c-av' : ''}">${dataBR(v)}${vencida ? ' · vencida' : ''}</span>` : '—'}</td><td>${esc(x['Nome do PC'] || '—')}<div class="mut">versão ${esc(x.Versao || '—')}</div></td>
-      <td><div class="acoesL">${x.Status === 'Bloqueada' ? `<button class="btn sm pri" data-a="desbloquear" data-c="${esc(x.Chave)}">Desbloquear</button>` : `<button class="btn sm dan" data-a="bloquear" data-c="${esc(x.Chave)}">Bloquear</button>`}
-        <button class="btn sm" data-a="copiar" data-c="${esc(x.Chave)}">Copiar chave</button><button class="btn sm" data-a="editar" data-c="${esc(x.Chave)}">Editar</button><button class="btn sm" data-a="entradas" data-c="${esc(x.Chave)}">Entradas</button></div></td></tr>`; }).join('') || '<tr><td colspan="6" class="mut" style="text-align:center;padding:30px">Nenhuma licença ainda. Clique em "Nova licença".</td></tr>';
+    const t = $('#bus').value.toLowerCase(), f = $('#fil').value;
+    const l = lista.filter(x => (!t || [x.Cliente, x.CNPJ, x.Obs, x.Telefone].join(' ').toLowerCase().includes(t)) && (!f || (f === 'vencida' ? vencida(x) : x.Status === f)));
+    $('#tb').innerHTML = l.map(x => { const v = venc(x);
+      const botoes = x.Status === 'Pendente' ? `<button class="btn sm pri" data-a="autorizar" data-c="${esc(x.Chave)}">Autorizar</button><button class="btn sm dan" data-a="recusar" data-c="${esc(x.Chave)}">Recusar</button>`
+        : `${x.Status === 'Bloqueada' ? `<button class="btn sm pri" data-a="desbloquear" data-c="${esc(x.Chave)}">Desbloquear</button>` : `<button class="btn sm dan" data-a="bloquear" data-c="${esc(x.Chave)}">Bloquear</button>`}
+           <button class="btn sm" data-a="vigencia" data-c="${esc(x.Chave)}">${vencida(x) ? 'Renovar' : 'Vigência'}</button><button class="btn sm" data-a="editar" data-c="${esc(x.Chave)}">Editar</button><button class="btn sm" data-a="entradas" data-c="${esc(x.Chave)}">Entradas</button>`;
+      return `<tr class="${x.Status === 'Pendente' ? 'novo' : ''}"><td><b>${esc(x.Cliente)}</b><div class="mut">${x.CNPJ ? esc(x.CNPJ) : ''}${x.Telefone ? ' · ' + esc(x.Telefone) : ''}</div>${x.Obs ? `<div class="mut">${esc(x.Obs)}</div>` : ''}</td>
+      <td>${situacao(x)}<div class="mut">${x.Status === 'Pendente' ? 'pediu em ' + dataBR(x.Criada) : 'último contato ' + dataBR(x['Ultimo contato'])}</div></td>
+      <td>${v ? `<span class="${vencida(x) ? 'chip c-av' : ''}">até ${dataBR(v)}</span>` : (x.Status === 'Pendente' ? '—' : 'sem data')}</td><td>${esc(x['Nome do PC'] || '—')}<div class="mut">versão ${esc(x.Versao || '—')}</div></td>
+      <td><div class="acoesL">${botoes}</div></td></tr>`; }).join('') || '<tr><td colspan="5" class="mut" style="text-align:center;padding:30px">Nenhum cliente ainda. Quando alguém instalar o PDV e fizer o cadastro, o pedido aparece aqui.</td></tr>';
     $$('#tb [data-a]').forEach(b => b.onclick = () => acao(b.dataset.a, lista.find(x => x.Chave === b.dataset.c)));
   };
-  $('#bus').oninput = desenha; $('#nova').onclick = () => editar({}); desenha();
+  $('#bus').oninput = desenha; $('#fil').onchange = desenha; desenha();
+  clearInterval(recarga);
+  recarga = setInterval(async () => { if (vista !== 'licencas' || $('#modais .fundo') || $('#painel').classList.contains('hide')) return; try { lista = (await api('admin_listar')).lista; badgePendentes(); desenha(); } catch (e) {} }, 30000);
+}
+// Janela para escolher até quando o acesso vale (autorizar / renovar)
+function janelaVigencia(l, titulo, botao, acaoApi) {
+  const atual = venc(l) && venc(l) >= hojeISO() ? venc(l) : somaDias(30);
+  const f = modal(titulo, `<p><b>${esc(l.Cliente)}</b>${l.CNPJ ? ' · ' + esc(l.CNPJ) : ''}${l.Obs ? `<br><span class="mut">${esc(l.Obs)}</span>` : ''}</p>
+    <div class="campo"><label>Liberado até</label><input id="vg" type="date" value="${atual}" min="${hojeISO()}"></div>
+    <div class="atalhos">${[[30, '+30 dias'], [90, '+3 meses'], [180, '+6 meses'], [365, '+1 ano']].map(([n, t]) => `<button class="btn sm" data-d="${n}">${t}</button>`).join('')}</div>
+    <p class="mut">Depois dessa data o sistema do cliente trava sozinho, até você renovar.</p>`,
+    [{ txt: 'Cancelar' }, { txt: botao, cls: 'pri', acao: async f => { const v = $('#vg', f).value; if (!v) { toast('Escolha a data.', 'er'); return false; } await acaoApi(v); } }]);
+  $$('.atalhos [data-d]', f).forEach(b => b.onclick = () => { $('#vg', f).value = somaDias(+b.dataset.d); });
 }
 async function acao(a, l) {
-  if (a === 'bloquear') { modal('Bloquear acesso', `<p>Bloquear <b>${esc(l.Cliente)}</b>? O sistema dele trava em até 10 minutos e mostra a tela de bloqueio com o seu contato.</p>`, [{ txt: 'Cancelar' }, { txt: 'Bloquear', cls: 'pri', acao: async () => { await api('admin_status', { chave: l.Chave, status: 'Bloqueada' }); toast('Bloqueado.', 'ok'); telaLicencas(); } }]); return; }
-  if (a === 'desbloquear') { await api('admin_status', { chave: l.Chave, status: 'Ativa' }); toast('Liberado. O cliente clica em "Verificar de novo" ou espera até 10 minutos.', 'ok'); return telaLicencas(); }
-  if (a === 'copiar') { try { await navigator.clipboard.writeText(l.Chave); toast('Chave copiada.', 'ok'); } catch (e) { toast(l.Chave); } return; }
+  if (a === 'autorizar') return janelaVigencia(l, 'Autorizar acesso', 'Autorizar', async v => { await api('admin_autorizar', { chave: l.Chave, vencimento: v }); toast(`Autorizado até ${dataBR(v)}. O sistema do cliente abre sozinho em alguns segundos.`, 'ok'); telaLicencas(); });
+  if (a === 'vigencia') return janelaVigencia(l, vencida(l) ? 'Renovar acesso' : 'Vigência do acesso', 'Salvar', async v => { await api('admin_autorizar', { chave: l.Chave, vencimento: v }); toast(`Vale até ${dataBR(v)}.`, 'ok'); telaLicencas(); });
+  if (a === 'recusar') { modal('Recusar pedido', `<p>Recusar o pedido de <b>${esc(l.Cliente)}</b>? O pedido some da lista. Se ele instalar de novo, chega um pedido novo.</p>`, [{ txt: 'Cancelar' }, { txt: 'Recusar', cls: 'dan', acao: async () => { await api('admin_excluir', { chave: l.Chave }); toast('Pedido recusado.', 'ok'); telaLicencas(); } }]); return; }
+  if (a === 'bloquear') { modal('Bloquear acesso', `<p>Bloquear <b>${esc(l.Cliente)}</b>? O sistema dele trava em até 10 minutos e mostra a tela de bloqueio com o seu contato.</p>`, [{ txt: 'Cancelar' }, { txt: 'Bloquear', cls: 'dan', acao: async () => { await api('admin_status', { chave: l.Chave, status: 'Bloqueada' }); toast('Bloqueado.', 'ok'); telaLicencas(); } }]); return; }
+  if (a === 'desbloquear') { await api('admin_status', { chave: l.Chave, status: 'Ativa' }); toast('Desbloqueado. O cliente clica em "Verificar de novo" ou espera até 10 minutos.', 'ok'); return telaLicencas(); }
   if (a === 'editar') return editar(l);
   if (a === 'entradas') return telaEntradas(l.Chave);
 }
 function editar(l) {
-  const c = (k, rot, tipo = 'text') => `<div class="campo"><label>${rot}</label><input data-k="${k}" type="${tipo}" value="${esc(tipo === 'date' ? String(l[k] || '').slice(0, 10) : l[k] || '')}"></div>`;
-  const tel = String(l.Telefone || '').replace(/\D/g, '');
-  const msg = l.Chave ? `Olá! Sua chave de acesso do PDV é: ${l.Chave}\nBaixe o sistema em: ${location.origin}` : '';
-  modal(l.Chave ? 'Editar licença' : 'Nova licença', `${c('Cliente', 'Nome do cliente / loja')}${c('Telefone', 'WhatsApp')}${c('CNPJ', 'CNPJ')}${c('Vencimento', 'Vencimento do plano', 'date')}${c('Obs', 'Observação')}
-    ${l.Chave ? `<p class="mut">Chave: <b class="chave">${esc(l.Chave)}</b>${tel ? ` · <a href="https://wa.me/55${tel}?text=${encodeURIComponent(msg)}" target="_blank">mandar chave no WhatsApp</a>` : ''}</p>` : ''}`,
-    [...(l.Chave ? [{ txt: 'Excluir', cls: 'dan', acao: async () => { if (!confirm('Excluir esta licença? O sistema do cliente para de funcionar.')) return false; await api('admin_excluir', { chave: l.Chave }); toast('Excluída.', 'ok'); telaLicencas(); } },
-      ...(l.Maquina ? [{ txt: 'Liberar troca de PC', acao: async () => { await api('admin_liberar_maquina', { chave: l.Chave }); toast('Pronto: a chave pode ser ativada em outro computador.', 'ok'); telaLicencas(); } }] : [])] : []),
+  const c = (k, rot) => `<div class="campo"><label>${rot}</label><input data-k="${k}" value="${esc(l[k] || '')}"></div>`;
+  modal('Editar cliente', `${c('Cliente', 'Nome do cliente / loja')}${c('Telefone', 'WhatsApp')}${c('CNPJ', 'CNPJ')}${c('Obs', 'Observação')}`,
+    [{ txt: 'Excluir', cls: 'dan', acao: async () => { if (!confirm('Excluir este cliente? O sistema dele trava e, se ele abrir de novo, manda um pedido novo.')) return false; await api('admin_excluir', { chave: l.Chave }); toast('Excluído.', 'ok'); telaLicencas(); } },
      { txt: 'Cancelar' },
-     { txt: 'Salvar', cls: 'pri', acao: async f => { const d = { Chave: l.Chave }; $$('[data-k]', f).forEach(i => d[i.dataset.k] = i.value.trim()); const r = await api('admin_salvar', { dados: d }); await telaLicencas();
-        if (!l.Chave) { const nova = lista.find(x => x.Chave === r.chave) || { ...d, Chave: r.chave }; toast('Licença criada: ' + r.chave, 'ok'); editar(nova); } } }]);
+     { txt: 'Salvar', cls: 'pri', acao: async f => { const d = { Chave: l.Chave, Vencimento: venc(l) }; $$('[data-k]', f).forEach(i => d[i.dataset.k] = i.value.trim()); await api('admin_salvar', { dados: d }); toast('Salvo.', 'ok'); telaLicencas(); } }]);
 }
 async function telaEntradas(chave = '') {
   vista = 'entradas'; $$('#painel nav a').forEach(a => a.classList.toggle('on', a.dataset.v === 'entradas'));

@@ -44,8 +44,12 @@ try {
   // ---------------- Licença (trava do app) ----------------
   if ($acao === 'licenca_estado') ok(['licenca' => licEstado(!empty($in['forcar']))]);
   if ($acao === 'licenca_ativar') ok(['licenca' => licAtivar((string)($in['chave'] ?? ''))]);
+  if ($acao === 'licenca_solicitar') ok(['licenca' => licSolicitar()]);
   $lic = licEstado();
-  if ($lic['status'] !== 'ativa') { http_response_code(402); echo json_encode(['ok' => false, 'erro' => 'Licença: ' . $lic['status'], 'licenca' => $lic], JSON_UNESCAPED_UNICODE); exit; }
+  // Antes de ter acesso, o cliente pode fazer o cadastro da empresa (o pedido vai junto com esses dados)
+  $cadastro = ['estado', 'config_salvar', 'cnpj_consulta', 'certificado', 'sefaz_status'];
+  $liberadoCadastro = in_array($lic['status'], ['sem_licenca', 'pendente'], true) && cfg('configurado') !== '1' && in_array($acao, $cadastro, true);
+  if ($lic['status'] !== 'ativa' && !$liberadoCadastro) { http_response_code(402); echo json_encode(['ok' => false, 'erro' => 'Licença: ' . $lic['status'], 'licenca' => $lic], JSON_UNESCAPED_UNICODE); exit; }
 
   switch ($acao) {
   // ---------------- Sessão e configuração ----------------
