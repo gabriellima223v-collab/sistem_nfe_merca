@@ -145,10 +145,14 @@ function finalizarVenda(array $in, array $u): array {
     $tot = round($qtd * $preco, 2);
     if (!empty($i['total_etiqueta'])) { $tot = round((float)$i['total_etiqueta'], 2); $preco = round($tot / $qtd, 4); } // valor exato impresso pela balança
     $itens[] = ['produto_id' => $p['id'], 'codigo' => $p['codigo'] ?: $p['id'], 'nome' => $p['nome'], 'unidade' => $p['unidade'], 'qtd' => $qtd, 'preco' => $preco, 'total' => $tot,
-      'desconto' => 0, 'custo' => (float)$p['custo'], 'ncm' => $p['ncm'], 'cfop' => $p['cfop'], 'csosn' => $p['csosn'], 'origem' => $p['origem'], 'cest' => $p['cest'], 'trib_aprox' => (float)$p['trib_aprox']];
+      'desconto' => 0, 'custo' => (float)$p['custo'], 'ncm' => $p['ncm'], 'cfop' => $p['cfop'], 'csosn' => $p['csosn'], 'origem' => $p['origem'], 'cest' => $p['cest'], 'trib_aprox' => (float)$p['trib_aprox'],
+      'tipo' => ($p['tipo'] ?? 'produto') === 'servico' ? 'servico' : 'produto', 'ctribnac' => $p['ctribnac'] ?? '', 'nbs' => $p['nbs'] ?? ''];
     $sub += $tot;
   }
   $sub = round($sub, 2);
+  $temProd = (bool)array_filter($itens, fn($i) => $i['tipo'] === 'produto'); $temServ = (bool)array_filter($itens, fn($i) => $i['tipo'] === 'servico');
+  if ($temProd && !emiteNFCe()) throw new Exception('Esta empresa está configurada para emitir só nota de SERVIÇO (NFS-e). Cadastre o item como serviço ou mude o tipo de emissão em Configurações.');
+  if ($temServ && !emiteNFSe()) throw new Exception('Esta empresa está configurada para emitir só nota de PRODUTO (NFC-e). Mude o tipo de emissão em Configurações para vender serviços.');
   $desc = round(max(0, (float)($in['desconto'] ?? 0)), 2);
   if ($desc > 0 && $u['perfil'] !== 'gerente') gerente($in['pin'] ?? null);
   if ($desc >= $sub) throw new Exception('Desconto maior que o total.');
@@ -177,11 +181,11 @@ function finalizarVenda(array $in, array $u): array {
   db()->beginTransaction();
   $vid = ex('INSERT INTO vendas (data,caixa_id,operador,subtotal,desconto,total,troco,cpf,cliente_id,nfce_status) VALUES (?,?,?,?,?,?,?,?,?,?)',
     [agora(), $cx['id'], $u['nome'], $sub, $desc, $total, $troco, soDigitos($in['cpf'] ?? '') ?: null, $cli['id'] ?? null, 'pendente']);
-  $si = db()->prepare('INSERT INTO venda_itens (venda_id,produto_id,codigo,nome,unidade,qtd,preco,desconto,total,custo,ncm,cfop,csosn,origem,cest,trib_aprox) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
+  $si = db()->prepare('INSERT INTO venda_itens (venda_id,produto_id,codigo,nome,unidade,qtd,preco,desconto,total,custo,ncm,cfop,csosn,origem,cest,trib_aprox,tipo,ctribnac,nbs) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
   $se = db()->prepare('UPDATE produtos SET estoque=estoque-? WHERE id=?');
   foreach ($itens as $it) {
-    $si->execute([$vid, $it['produto_id'], $it['codigo'], $it['nome'], $it['unidade'], $it['qtd'], $it['preco'], $it['desconto'], $it['total'], $it['custo'], $it['ncm'], $it['cfop'], $it['csosn'], $it['origem'], $it['cest'], $it['trib_aprox']]);
-    $se->execute([$it['qtd'], $it['produto_id']]);
+    $si->execute([$vid, $it['produto_id'], $it['codigo'], $it['nome'], $it['unidade'], $it['qtd'], $it['preco'], $it['desconto'], $it['total'], $it['custo'], $it['ncm'], $it['cfop'], $it['csosn'], $it['origem'], $it['cest'], $it['trib_aprox'], $it['tipo'], $it['ctribnac'], $it['nbs']]);
+    if ($it['tipo'] === 'produto') $se->execute([$it['qtd'], $it['produto_id']]); // serviço não mexe no estoque
   }
   $sp = db()->prepare('INSERT INTO venda_pag (venda_id,forma,valor,integrado,bandeira,nsu,autorizacao,cnpj_cred,data) VALUES (?,?,?,?,?,?,?,?,?)');
   foreach ($pags as $p) $sp->execute([$vid, $p['forma'], $p['valor'], $p['integrado'], $p['bandeira'], $p['nsu'], $p['autorizacao'], $p['cnpj_cred'], agora()]);
@@ -193,9 +197,25 @@ function finalizarVenda(array $in, array $u): array {
 
   // Emissão da NFC-e (fora da transação: a venda nunca se perde, mesmo se a SEFAZ falhar)
   $venda = q1('SELECT * FROM vendas WHERE id=?', [$vid]);
-  try { $r = emitirNFCe($venda, $itens, $pags); } // montarXML soma o troco de volta no pagamento em dinheiro
-  catch (Throwable $e) { $r = ['nfce_status' => 'rejeitada', 'motivo' => $e->getMessage()]; }
-  atualizarVendaFiscal($vid, $r);
+  $prods = array_values(array_filter($itens, fn($i) => $i['tipo'] === 'produto'));
+  $servs = array_values(array_filter($itens, fn($i) => $i['tipo'] === 'servico'));
+  // NFC-e: só os produtos. Numa venda mista, o pagamento é dividido proporcionalmente entre as duas notas.
+  if ($prods) {
+    $vProd = round(array_sum(array_map(fn($i) => $i['total'] - $i['desconto'], $prods)), 2);
+    $vendaNota = $venda; $pagsNota = $pags;
+    if ($servs) {
+      $vendaNota['troco'] = 0; $f = $total > 0 ? $vProd / $total : 1; $acum = 0;
+      foreach ($pagsNota as $k => $pg) { $pagsNota[$k]['valor'] = $k === count($pagsNota) - 1 ? round($vProd - $acum, 2) : round($pg['valor'] * $f, 2); $acum += $pagsNota[$k]['valor']; }
+      $pagsNota = array_values(array_filter($pagsNota, fn($pg) => $pg['valor'] > 0));
+    }
+    try { $r = emitirNFCe($vendaNota, $prods, $pagsNota); } // montarXML soma o troco de volta no pagamento em dinheiro
+    catch (Throwable $e) { $r = ['nfce_status' => 'rejeitada', 'motivo' => $e->getMessage()]; }
+    atualizarVendaFiscal($vid, $r);
+  } else {
+    atualizarVendaFiscal($vid, ['nfce_status' => 'sem_nota', 'motivo' => 'Venda só de serviços (NFS-e)']);
+  }
+  // NFS-e: os serviços (uma nota por código de serviço)
+  if ($servs) { try { emitirNFSeVenda($venda, $servs, $cli); } catch (Throwable $e) { /* o erro fica registrado na NFS-e */ } }
   return ['venda' => vendaCompleta($vid)];
 }
 function atualizarVendaFiscal(int $id, array $r): void {
@@ -208,12 +228,18 @@ function vendaCompleta(int $id): array {
   $v['itens'] = q('SELECT * FROM venda_itens WHERE venda_id=?', [$id]);
   $v['pagamentos'] = q('SELECT * FROM venda_pag WHERE venda_id=?', [$id]);
   $v['cliente'] = $v['cliente_id'] ? q1('SELECT id,nome,saldo FROM clientes WHERE id=?', [$v['cliente_id']]) : null;
+  $v['nfse'] = q('SELECT * FROM nfse WHERE venda_id=? ORDER BY id', [$id]);
+  $u = nfseUrls(); foreach ($v['nfse'] as $k => $n) $v['nfse'][$k]['url_consulta'] = $n['chave'] ? $u['consulta'] . $n['chave'] : '';
   return $v;
 }
 function cancelarVenda(int $id, string $just, array $g): array {
   $v = q1('SELECT * FROM vendas WHERE id=?', [$id]); if (!$v || $v['status'] === 'cancelada') throw new Exception('Venda já cancelada ou inexistente.');
   $r = cancelarNFCe($v, $just ?: 'Cancelamento solicitado pelo cliente no caixa');
   if (!$r['ok']) throw new Exception($r['msg']);
+  foreach (q("SELECT * FROM nfse WHERE venda_id=? AND status<>'cancelada'", [$id]) as $n) {
+    $rn = nfseCancelar($n, $just ?: 'Cancelamento solicitado pelo cliente no caixa');
+    if (!$rn['ok']) throw new Exception($rn['msg']);
+  }
   db()->beginTransaction();
   foreach (q('SELECT * FROM venda_itens WHERE venda_id=?', [$id]) as $it) ex('UPDATE produtos SET estoque=estoque+? WHERE id=?', [$it['qtd'], $it['produto_id']]);
   $fiado = (float)qv("SELECT COALESCE(SUM(valor),0) FROM venda_pag WHERE venda_id=? AND forma='fiado'", [$id]);

@@ -42,6 +42,14 @@ function criarTabelas(PDO $pdo): void {
   CREATE TABLE IF NOT EXISTS conciliacao (id INTEGER PRIMARY KEY, importado TEXT, data TEXT, valor REAL, forma TEXT, bandeira TEXT, nsu TEXT, venda_pag_id INTEGER, situacao TEXT);
   CREATE TABLE IF NOT EXISTS log (id INTEGER PRIMARY KEY, data TEXT, usuario TEXT, acao TEXT, detalhe TEXT);
   ");
+  // NFS-e (serviços) — tabela e colunas novas (atualiza instalações antigas)
+  $pdo->exec("CREATE TABLE IF NOT EXISTS nfse (id INTEGER PRIMARY KEY, venda_id INTEGER, data TEXT, serie INTEGER, numero INTEGER, id_dps TEXT, ctribnac TEXT, nbs TEXT,
+    descricao TEXT, valor REAL, desconto REAL DEFAULT 0, tomador_doc TEXT, tomador_nome TEXT, status TEXT, motivo TEXT, chave TEXT, nnfse TEXT, xml_path TEXT)");
+  $pdo->exec('CREATE INDEX IF NOT EXISTS ix_nfse_venda ON nfse(venda_id)');
+  $cols = array_column($pdo->query('PRAGMA table_info(produtos)')->fetchAll(), 'name');
+  foreach (['tipo' => "TEXT DEFAULT 'produto'", 'ctribnac' => 'TEXT', 'nbs' => 'TEXT'] as $c => $t) if (!in_array($c, $cols, true)) $pdo->exec("ALTER TABLE produtos ADD COLUMN $c $t");
+  $cols = array_column($pdo->query('PRAGMA table_info(venda_itens)')->fetchAll(), 'name');
+  foreach (['tipo' => "TEXT DEFAULT 'produto'", 'ctribnac' => 'TEXT', 'nbs' => 'TEXT'] as $c => $t) if (!in_array($c, $cols, true)) $pdo->exec("ALTER TABLE venda_itens ADD COLUMN $c $t");
   if (!(int)$pdo->query('SELECT COUNT(*) FROM usuarios')->fetchColumn()) {
     $pdo->exec("INSERT INTO usuarios (nome,pin,perfil) VALUES ('Gerente','" . password_hash('1234', PASSWORD_DEFAULT) . "','gerente')");
   }

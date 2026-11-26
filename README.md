@@ -1,6 +1,6 @@
 # PDV
 
-Caixa com NFC-e (biblioteca gratuita sped-nfe), estoque, fiado e painel do dono — com licença controlada pelo site.
+Caixa com NFC-e (produtos, biblioteca gratuita sped-nfe) e NFS-e nacional (serviços, API Sefin Nacional), estoque, fiado e painel do dono — com licença controlada pelo site.
 
 ```
 app/        sistema do caixa (PHP local + interface) — vira o instalador .exe

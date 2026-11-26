@@ -32,8 +32,13 @@ transmite as notas sozinho quando a conexão volta.
  2. O assistente pede:
     • CNPJ (clique em Buscar: o resto é preenchido sozinho) e a
       Inscrição Estadual;
-    • certificado A1 (.pfx + senha), CSC e ID do CSC;
-    • série (use 2, diferente do sistema antigo) e próximo número (1).
+    • o que a empresa vende: PRODUTOS (NFC-e), SERVIÇOS (NFS-e) ou OS DOIS;
+    • certificado A1 (.pfx + senha) — serve para as duas notas;
+    • NFC-e: CSC e ID do CSC, série (use 2, diferente do sistema antigo)
+      e próximo número (1);
+    • NFS-e: inscrição municipal (se tiver), série e próximo número da DPS.
+      O código de tributação nacional (6 números) vai no cadastro de
+      cada serviço — confirme com o contador.
     Comece em "Teste (homologação)": as notas vão para a SEFAZ mas não
     têm valor fiscal. Depois troque para "Produção" em Configurações.
  3. Entre com a senha do gerente: 1234 (troque em Configurações >
@@ -70,8 +75,11 @@ do Windows. O sistema imprime direto, sem abrir janela de impressão.
 --------------------------------------------------------------
  • Caixa: abertura, sangria, suprimento, fechamento com conferência
    do dinheiro e resumo pronto para enviar no WhatsApp do dono.
- • NFC-e: emissão, cancelamento, contingência offline, reemissão de
-   rejeitadas, XMLs do mês em .zip para o contador.
+ • NFC-e (produtos): emissão, cancelamento, contingência offline,
+   reemissão de rejeitadas, XMLs do mês em .zip para o contador.
+ • NFS-e (serviços): emissão pelo sistema nacional (nfse.gov.br) com o
+   certificado A1, cancelamento, reenvio automático se cair a internet.
+   Venda com produto e serviço sai em duas notas, automaticamente.
  • Maquininha: separada (caixa confirma) ou Mercado Pago Point
    integrada (o valor vai sozinho). Conciliação do extrato da
    maquininha com as vendas (pega erro e desvio).

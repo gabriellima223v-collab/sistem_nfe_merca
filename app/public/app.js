@@ -147,6 +147,8 @@ function montarApp() {
   $('#app').classList.toggle('mini', ler('mini', false));
   $('#nomeLoja').textContent = S.cfg.emp_fantasia || S.cfg.emp_razao || 'PDV';
   $('#nomeUser').textContent = S.u.nome + (S.u.perfil === 'gerente' ? ' · gerente' : '');
+  TELAS.find(t => t.id === 'produtos').nome = { nfce: 'Produtos e estoque', nfse: 'Serviços', ambos: 'Produtos e serviços' }[S.cfg.emissao || 'nfce'];
+  TELAS.find(t => t.id === 'vendas').nome = { nfce: 'Vendas e NFC-e', nfse: 'Vendas e NFS-e', ambos: 'Vendas e notas' }[S.cfg.emissao || 'nfce'];
   $('#menu').innerHTML = TELAS.filter(t => t.todos || S.u.perfil === 'gerente').map(t => `<a href="#${t.id}" data-t="${t.id}" title="${t.nome}">${ico(t.ic)}<span>${t.nome}</span><em class="bdg hide" data-b="${t.id}"></em></a>`).join('');
   $$('#menu a').forEach(a => a.onclick = e => { e.preventDefault(); ir(a.dataset.t); });
   $('#btnMini').onclick = () => { const m = !$('#app').classList.contains('mini'); $('#app').classList.toggle('mini', m); guardar('mini', m); };
@@ -222,16 +224,28 @@ function assistente(passo = 1, dados = {}) {
       <div class="campo"><label>Regime</label><select data-k="emp_crt"><option value="1">Simples Nacional</option><option value="4">MEI</option><option value="3">Regime normal</option></select></div>${campo('emp_fone', 'Telefone')}</div>
     <div class="grid g3">${campo('emp_logradouro', 'Endereço')}${campo('emp_numero', 'Número')}${campo('emp_bairro', 'Bairro')}</div>
     <div class="grid g4">${campo('emp_municipio', 'Cidade')}${campo('emp_uf', 'UF', 'text', 'maxlength="2"')}${campo('emp_cep', 'CEP')}${campo('emp_cmun', 'Cód. IBGE da cidade')}</div>`;
-  if (passo === 2) corpo = `<h2>Nota fiscal (NFC-e)</h2><p class="ajuda" style="margin-bottom:14px">O certificado fica guardado só neste computador, com a senha criptografada.</p>
+  const emi = c.emissao || 'nfce';
+  if (passo === 2) corpo = `<h2>Nota fiscal</h2><p class="ajuda" style="margin-bottom:10px">O que a sua empresa vende? Isso define qual nota o sistema emite em cada venda.</p>
+    <input type="hidden" data-k="emissao" id="wEmi" value="${emi}">
+    <div class="escolha emi" style="grid-template-columns:repeat(3,minmax(0,1fr));margin:0 0 16px">
+      <button type="button" data-e="nfce" class="${emi === 'nfce' ? 'on' : ''}"><b>Produtos</b><span>Nota de consumidor (NFC-e) — mercado, loja, padaria</span></button>
+      <button type="button" data-e="nfse" class="${emi === 'nfse' ? 'on' : ''}"><b>Serviços</b><span>Nota de serviço (NFS-e) — barbearia, salão, clínica, oficina</span></button>
+      <button type="button" data-e="ambos" class="${emi === 'ambos' ? 'on' : ''}"><b>Os dois</b><span>Vende produtos e presta serviços — cada um sai na sua nota</span></button>
+    </div>
+    <p class="ajuda" style="margin-bottom:10px">O certificado A1 serve para as duas notas e fica guardado só neste computador, com a senha criptografada.</p>
     <div class="card" style="box-shadow:none;border:1px solid var(--linha);margin-bottom:14px">
       <div class="grid g2"><div class="campo"><label>Certificado digital A1 (.pfx ou .p12)</label><input type="file" id="wCert" accept=".pfx,.p12"></div>
       <div class="campo"><label>Senha do certificado</label><input type="password" id="wSenha" autocomplete="off"></div></div>
       <button class="btn" id="wEnvCert">Validar certificado</button> <span id="wCertInfo" class="ajuda">${c.cert_validade ? '✓ Certificado válido até ' + c.cert_validade.split('-').reverse().join('/') : ''}</span>
     </div>
-    <div class="grid g2">${campo('csc', 'CSC (código de segurança do contribuinte)')}${campo('csc_id', 'ID do CSC', 'text', 'placeholder="ex.: 1 ou 000001"')}</div>
-    <div class="grid g3"><div class="campo"><label>Ambiente</label><select data-k="ambiente"><option value="homologacao">Teste (homologação)</option><option value="producao">Produção (valendo)</option></select></div>
-      ${campo('nfce_serie', 'Série da NFC-e', 'number', 'min="1"')}${campo('nfce_numero', 'Próximo número', 'number', 'min="1"')}</div>
-    <p class="ajuda">Dica: use uma série diferente da do sistema antigo (ex.: 2) enquanto os dois existirem. O CSC você pega com o contador ou no portal da SEFAZ do seu estado.</p>`;
+    <div class="campo" style="max-width:320px"><label>Ambiente</label><select data-k="ambiente"><option value="homologacao">Teste (homologação)</option><option value="producao">Produção (valendo)</option></select></div>
+    <div id="wNfce" class="${emi === 'nfse' ? 'hide' : ''}"><h3 style="margin:6px 0 8px;font-size:16px">NFC-e (produtos)</h3>
+      <div class="grid g2">${campo('csc', 'CSC (código de segurança do contribuinte)')}${campo('csc_id', 'ID do CSC', 'text', 'placeholder="ex.: 1 ou 000001"')}</div>
+      <div class="grid g2">${campo('nfce_serie', 'Série da NFC-e', 'number', 'min="1"')}${campo('nfce_numero', 'Próximo número da NFC-e', 'number', 'min="1"')}</div>
+      <p class="ajuda">Use uma série diferente da do sistema antigo (ex.: 2) enquanto os dois existirem. O CSC você pega com o contador ou no portal da SEFAZ do seu estado.</p></div>
+    <div id="wNfse" class="${emi === 'nfce' ? 'hide' : ''}"><h3 style="margin:14px 0 8px;font-size:16px">NFS-e (serviços) — emissor nacional</h3>
+      <div class="grid g3">${campo('nfse_im', 'Inscrição municipal (se tiver)')}${campo('nfse_serie', 'Série da DPS', 'number', 'min="1" max="49999" placeholder="1"')}${campo('nfse_numero', 'Próximo número da DPS', 'number', 'min="1" placeholder="1"')}</div>
+      <p class="ajuda">A NFS-e sai pelo sistema nacional (nfse.gov.br), com o mesmo certificado A1. Se a empresa já emitia NFS-e por outro sistema, continue a numeração dele ou use outra série. O código de cada serviço é informado no cadastro do serviço.</p></div>`;
   if (passo === 3) corpo = `<h2>Testando tudo</h2><p class="ajuda" style="margin-bottom:14px">Conferindo se está tudo pronto para emitir.</p><div id="wChecks"></div><button class="btn" id="wRetestar">Testar de novo</button>`;
   if (passo === 4) corpo = `<h2>Maquininha de cartão</h2>
     <div class="campo"><label>Como você recebe cartão?</label><select data-k="maquininha" id="wMaq">
@@ -253,6 +267,7 @@ function assistente(passo = 1, dados = {}) {
     $('#wBusca').onclick = buscar; $('#w_emp_cnpj').onkeydown = e => { if (e.key === 'Enter') buscar(); };
   }
   if (passo === 2) {
+    $$('.emi button').forEach(b => b.onclick = () => { $$('.emi button').forEach(x => x.classList.toggle('on', x === b)); $('#wEmi').value = b.dataset.e; $('#wNfce').classList.toggle('hide', b.dataset.e === 'nfse'); $('#wNfse').classList.toggle('hide', b.dataset.e === 'nfce'); });
     $('#wEnvCert').onclick = async () => {
       const f = $('#wCert').files[0]; if (!f) return toast('Escolha o arquivo do certificado.', 'er');
       try { const r = await api('certificado', { senha: $('#wSenha').value }, f); dados.cert_validade = r.info.validade;
@@ -264,13 +279,14 @@ function assistente(passo = 1, dados = {}) {
   if (passo === 3) {
     const testar = async () => {
       const ck = (ok, t, d = '') => `<div class="check ${ok === null ? '' : ok ? 'ok' : 'er'}"><div class="ic">${ok === null ? '…' : ok ? '✓' : '!'}</div><div><b>${t}</b><div class="ajuda">${esc(d)}</div></div></div>`;
-      let h = ck(!!(c.emp_cnpj && c.emp_razao && c.emp_ie && c.emp_cmun), 'Dados da empresa', c.emp_cmun ? '' : 'Falta o código IBGE da cidade (use Buscar no passo anterior).');
+      const soServ = (c.emissao || 'nfce') === 'nfse';
+      let h = ck(!!(c.emp_cnpj && c.emp_razao && (soServ || c.emp_ie) && c.emp_cmun), 'Dados da empresa', !c.emp_cmun ? 'Falta o código IBGE da cidade (use Buscar no passo anterior).' : (!soServ && !c.emp_ie ? 'Falta a Inscrição Estadual (obrigatória para NFC-e).' : ''));
       h += ck(!!c.cert_validade, 'Certificado A1', c.cert_validade ? 'Válido até ' + c.cert_validade.split('-').reverse().join('/') : 'Envie o certificado no passo anterior.');
-      h += ck(!!(c.csc && c.csc_id), 'CSC configurado');
-      h += ck(!!S.est.biblioteca, 'Biblioteca fiscal (sped-nfe)', S.est.biblioteca ? 'Instalada' : 'Reinstale o PDV pelo site.');
-      $('#wChecks').innerHTML = h + ck(null, 'Conexão com a SEFAZ', 'Testando…');
-      try { const r = await api('sefaz_status'); $('#wChecks').lastElementChild.outerHTML = ck(r.ok, 'Conexão com a SEFAZ', r.msg); }
-      catch (e) { $('#wChecks').lastElementChild.outerHTML = ck(false, 'Conexão com a SEFAZ', e.message); }
+      if ((c.emissao || 'nfce') !== 'nfse') h += ck(!!(c.csc && c.csc_id), 'CSC configurado (NFC-e)');
+      if (!soServ) h += ck(!!S.est.biblioteca, 'Biblioteca fiscal da NFC-e (sped-nfe)', S.est.biblioteca ? 'Instalada' : 'Reinstale o PDV pelo site.');
+      $('#wChecks').innerHTML = h + ck(null, 'Conexão com a Receita / SEFAZ', 'Testando…');
+      try { const r = await api('sefaz_status'); $('#wChecks').lastElementChild.outerHTML = (r.itens || [{ tipo: 'Conexão', ok: r.ok, msg: r.msg }]).map(x => ck(x.ok, 'Conexão ' + x.tipo, x.msg)).join(''); }
+      catch (e) { $('#wChecks').lastElementChild.outerHTML = ck(false, 'Conexão com a Receita / SEFAZ', e.message); }
     };
     $('#wRetestar').onclick = testar; testar();
   }
@@ -281,6 +297,8 @@ function assistente(passo = 1, dados = {}) {
     if (passo === 1) dados.emp_uf = dados.emp_uf.toUpperCase();
     if (passo === 2 && !dados.nfce_serie) { dados.nfce_serie = '2'; }
     if (passo === 2 && !dados.nfce_numero) { dados.nfce_numero = '1'; }
+    if (passo === 2 && !dados.nfse_serie) { dados.nfse_serie = '1'; }
+    if (passo === 2 && !dados.nfse_numero) { dados.nfse_numero = '1'; }
     const envio = { ...dados }; delete envio.cert_validade; if (passo === 4) envio.configurado = '1';
     try { const r = await api('config_salvar', envio); S.cfg = r.config; } catch (e) { return toast(e.message, 'er'); }
     if (passo === 4) { location.reload(); return; }
@@ -351,7 +369,7 @@ function adicionar(p, qtd, totalEtiqueta) {
   const ult = S.venda.itens[S.venda.itens.length - 1];
   if (!totalEtiqueta && ult && ult.p.id === p.id && !ult.total_etiqueta && p.unidade !== 'KG') ult.qtd = r2(ult.qtd + qtd);
   else S.venda.itens.push({ p, qtd, total_etiqueta: totalEtiqueta || null });
-  if (p.estoque !== null && +p.estoque - qtd < 0 && p.unidade !== 'KG') toast(`Estoque de "${p.nome}" ficará negativo. Lance a entrada da nota depois.`);
+  if (p.tipo !== 'servico' && p.estoque !== null && +p.estoque - qtd < 0 && p.unidade !== 'KG') toast(`Estoque de "${p.nome}" ficará negativo. Lance a entrada da nota depois.`);
   S.venda.mult = 1; S.venda.sel = S.venda.itens.length - 1; mostrarMult(); bip(); salvarVenda(); desenharCesta(true);
 }
 function desenharCesta(novo) {
@@ -359,7 +377,7 @@ function desenharCesta(novo) {
   const v = S.venda;
   tb.innerHTML = v.itens.map((it, k) => { const pr = precoItem(it); const promo = it.p.promo_qtd && it.qtd >= +it.p.promo_qtd && !it.total_etiqueta;
     return `<tr data-k="${k}" class="cl ${k === v.sel ? 'sel' : ''} ${novo && k === v.itens.length - 1 ? 'novo' : ''}"><td class="num" style="color:var(--mut)">${k + 1}</td>
-    <td><div class="nome">${esc(it.p.nome)}${promo ? ' <span class="chip p-ok">promoção</span>' : ''}</div><div class="cod">${esc(it.p.codigo || 'balança ' + (it.p.cod_balanca || ''))}</div></td>
+    <td><div class="nome">${esc(it.p.nome)}${promo ? ' <span class="chip p-ok">promoção</span>' : ''}${it.p.tipo === 'servico' ? ' <span class="chip p-in">serviço</span>' : ''}</div><div class="cod">${esc(it.p.codigo || (it.p.tipo === 'servico' ? 'serviço' : 'balança ' + (it.p.cod_balanca || '')))}</div></td>
     <td class="r">${QT(it.qtd, it.p.unidade)} ${esc(it.p.unidade)}</td><td class="r">${N2(pr.unit)}</td><td class="r"><b>${N2(pr.total)}</b></td></tr>`; }).join('');
   $('#cestaVazia').classList.toggle('hide', v.itens.length > 0);
   $$('#itens tr').forEach(tr => tr.onclick = () => { v.sel = +tr.dataset.k; desenharCesta(); });
@@ -517,47 +535,74 @@ function cobrarMaquininha(forma, valor) {
 // ----- Cupom (DANFCE) -----
 function cupomHTML(v) {
   const c = S.cfg; const st = v.nfce_status;
-  const aviso = (c.ambiente === 'homologacao' && st !== 'rejeitada') ? 'EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL' : st === 'contingencia' ? 'EMITIDA EM CONTINGÊNCIA<br>Pendente de autorização' : '';
-  const trib = v.itens.reduce((s, i) => s + (i.total - i.desconto) * (+i.trib_aprox || 0) / 100, 0);
+  const prods = v.itens.filter(i => i.tipo !== 'servico'), servs = v.itens.filter(i => i.tipo === 'servico');
+  const temNFCe = prods.length > 0 && st !== 'sem_nota';
+  const homolog = c.ambiente === 'homologacao';
+  const aviso = (homolog && st !== 'rejeitada') ? 'EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL' : st === 'contingencia' ? 'EMITIDA EM CONTINGÊNCIA<br>Pendente de autorização' : '';
+  const trib = prods.reduce((s, i) => s + (i.total - i.desconto) * (+i.trib_aprox || 0) / 100, 0);
   const pags = v.pagamentos.map(p => `<tr><td>${FORMAS[p.forma] || p.forma}</td><td style="text-align:right">${N2(p.valor + (p.forma === 'dinheiro' ? +v.troco : 0))}</td></tr>`).join('');
   const chave = (v.chave || '').replace(/(\d{4})/g, '$1 ').trim();
-  return `<div class="cupom">
-    <div class="c b">${esc(c.emp_fantasia || c.emp_razao)}</div><div class="c">${esc(c.emp_razao)}</div>
-    <div class="c">CNPJ ${esc((c.emp_cnpj || '').replace(/\D/g, '').replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5'))} IE ${esc(c.emp_ie)}</div>
-    <div class="c">${esc(c.emp_logradouro)}, ${esc(c.emp_numero)} - ${esc(c.emp_bairro)} - ${esc(c.emp_municipio)}/${esc(c.emp_uf)}</div><hr>
+  const doc = d => { d = String(d || '').replace(/\D/g, ''); return d.length === 11 ? d.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4') : d.length === 14 ? d.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5') : d; };
+  const lista = its => `<table><tr><td class="b">#</td><td class="b">DESCRIÇÃO</td><td class="b" style="text-align:right">TOTAL</td></tr>
+    ${its.map((i, k) => `<tr><td>${k + 1}</td><td>${i.tipo === 'servico' ? '' : esc(i.codigo) + ' '}${esc(i.nome)}<br>${QT(i.qtd, i.unidade)} ${esc(i.unidade)} x ${N2(i.preco)}</td><td style="text-align:right">${N2(i.total)}</td></tr>`).join('')}</table>`;
+  const somaP = prods.reduce((s, i) => s + +i.total, 0), descP = prods.reduce((s, i) => s + +i.desconto, 0);
+  const blocoNFCe = !temNFCe ? '' : `
     <div class="c b">Documento Auxiliar da Nota Fiscal de Consumidor Eletrônica</div>${aviso ? `<div class="aviso">${aviso}</div>` : '<hr>'}
-    <table><tr><td class="b">#</td><td class="b">DESCRIÇÃO</td><td class="b" style="text-align:right">TOTAL</td></tr>
-    ${v.itens.map((i, k) => `<tr><td>${k + 1}</td><td>${esc(i.codigo)} ${esc(i.nome)}<br>${QT(i.qtd, i.unidade)} ${esc(i.unidade)} x ${N2(i.preco)}</td><td style="text-align:right">${N2(i.total)}</td></tr>`).join('')}</table><hr>
-    <table><tr><td>Qtde. total de itens</td><td style="text-align:right">${v.itens.length}</td></tr><tr><td>Valor total R$</td><td style="text-align:right">${N2(v.subtotal)}</td></tr>
-    ${+v.desconto ? `<tr><td>Descontos R$</td><td style="text-align:right">${N2(v.desconto)}</td></tr>` : ''}<tr><td class="b">VALOR A PAGAR R$</td><td class="b" style="text-align:right">${N2(v.total)}</td></tr>
-    <tr><td class="b">FORMA PAGAMENTO</td><td class="b" style="text-align:right">VALOR PAGO</td></tr>${pags}${+v.troco ? `<tr><td>Troco R$</td><td style="text-align:right">${N2(v.troco)}</td></tr>` : ''}</table><hr>
+    ${lista(prods)}<hr>
+    <table><tr><td>Qtde. total de itens</td><td style="text-align:right">${prods.length}</td></tr><tr><td>Valor total R$</td><td style="text-align:right">${N2(somaP)}</td></tr>
+    ${descP ? `<tr><td>Descontos R$</td><td style="text-align:right">${N2(descP)}</td></tr>` : ''}<tr><td class="b">VALOR A PAGAR R$</td><td class="b" style="text-align:right">${N2(somaP - descP)}</td></tr></table><hr>
     ${st === 'rejeitada' || !v.chave ? `<div class="aviso">NFC-e NÃO EMITIDA<br><span style="font-weight:400">${esc(v.motivo || '')}</span></div>` : `
     <div class="c">Consulte pela Chave de Acesso em<br>${esc(v.url_chave)}</div><div class="c b" style="margin:4px 0">${chave}</div><hr>
-    <div class="c">${v.cpf ? 'CONSUMIDOR CPF: ' + esc(v.cpf.replace(/(\d{3})(\d{3})(\d{3})(\d{2})/, '$1.$2.$3-$4')) : 'CONSUMIDOR NÃO IDENTIFICADO'}</div>
+    <div class="c">${v.cpf ? 'CONSUMIDOR CPF: ' + esc(doc(v.cpf)) : 'CONSUMIDOR NÃO IDENTIFICADO'}</div>
     <div class="c b">NFC-e nº ${String(v.numero).padStart(9, '0')} Série ${String(v.serie).padStart(3, '0')} ${dataBR(v.data)}</div>
     ${v.protocolo ? `<div class="c">Protocolo de autorização: ${esc(v.protocolo)}<br>Data de autorização ${dataBR(v.data)}</div>` : ''}
     <div class="qr">${qrSVG(v.qrcode || v.chave)}</div>`}
-    <div class="c">Tributos totais incidentes (Lei Federal 12.741/2012) R$ ${N2(trib)}</div><hr>
+    <div class="c">Tributos totais incidentes (Lei Federal 12.741/2012) R$ ${N2(trib)}</div><hr>`;
+  const blocoNFSe = (v.nfse || []).map(n => `
+    <div class="c b">NFS-e — Nota Fiscal de Serviço Eletrônica</div>${homolog && n.status !== 'rejeitada' ? '<div class="aviso">EMITIDA EM AMBIENTE DE HOMOLOGAÇÃO - SEM VALOR FISCAL</div>' : '<hr>'}
+    <table><tr><td colspan="2">${esc(n.descricao)}</td></tr><tr><td>Código do serviço</td><td style="text-align:right">${esc(String(n.ctribnac).replace(/(\d{2})(\d{2})(\d{2})/, '$1.$2.$3'))}</td></tr>
+    <tr><td>Valor do serviço R$</td><td style="text-align:right">${N2(n.valor)}</td></tr>${+n.desconto ? `<tr><td>Desconto R$</td><td style="text-align:right">${N2(n.desconto)}</td></tr>` : ''}
+    <tr><td class="b">VALOR LÍQUIDO R$</td><td class="b" style="text-align:right">${N2(n.valor - n.desconto)}</td></tr></table>
+    <div class="c">${n.tomador_doc ? 'TOMADOR: ' + esc(n.tomador_nome || '') + ' ' + esc(doc(n.tomador_doc)) : 'TOMADOR NÃO IDENTIFICADO'}</div>
+    ${n.status === 'autorizada' ? `<div class="c b">NFS-e nº ${esc(n.nnfse || '—')} · DPS ${esc(n.serie)}/${esc(n.numero)}</div><div class="c">Chave de acesso</div><div class="c b" style="margin:2px 0;font-size:10.5px">${esc(String(n.chave).replace(/(\d{5})/g, '$1 ').trim())}</div><div class="c">Consulte em nfse.gov.br/ConsultaPublica</div><div class="qr">${qrSVG(n.url_consulta)}</div>`
+      : n.status === 'pendente' ? `<div class="aviso">NFS-e PENDENTE DE ENVIO<br><span style="font-weight:400">Será enviada automaticamente</span></div>`
+      : n.status === 'cancelada' ? `<div class="aviso">NFS-e CANCELADA</div>` : `<div class="aviso">NFS-e NÃO EMITIDA<br><span style="font-weight:400">${esc(n.motivo || '')}</span></div>`}<hr>`).join('');
+  const resumo = (servs.length || !temNFCe) ? `<div class="c b">RESUMO DA VENDA</div><table><tr><td>Total R$</td><td style="text-align:right">${N2(v.subtotal)}</td></tr>${+v.desconto ? `<tr><td>Descontos R$</td><td style="text-align:right">${N2(v.desconto)}</td></tr>` : ''}<tr><td class="b">TOTAL PAGO R$</td><td class="b" style="text-align:right">${N2(v.total)}</td></tr>` : '<table>';
+  return `<div class="cupom">
+    <div class="c b">${esc(c.emp_fantasia || c.emp_razao)}</div><div class="c">${esc(c.emp_razao)}</div>
+    <div class="c">CNPJ ${esc(doc(c.emp_cnpj))}${c.emp_ie ? ' IE ' + esc(c.emp_ie) : ''}${c.nfse_im ? ' IM ' + esc(c.nfse_im) : ''}</div>
+    <div class="c">${esc(c.emp_logradouro)}, ${esc(c.emp_numero)} - ${esc(c.emp_bairro)} - ${esc(c.emp_municipio)}/${esc(c.emp_uf)}</div><hr>
+    ${blocoNFCe}${blocoNFSe}
+    ${resumo}<tr><td class="b">FORMA PAGAMENTO</td><td class="b" style="text-align:right">VALOR PAGO</td></tr>${pags}${+v.troco ? `<tr><td>Troco R$</td><td style="text-align:right">${N2(v.troco)}</td></tr>` : ''}</table><hr>
     ${v.cliente && v.pagamentos.some(p => p.forma === 'fiado') ? `<div class="c">Fiado: ${esc(v.cliente.nome)} · saldo ${R(v.cliente.saldo)}<br><br>Assinatura: ____________________</div><hr>` : ''}
     <div class="c">${esc(c.msg_cupom || 'Obrigado pela preferência!')}</div><div class="c" style="font-size:10px;margin-top:4px">Venda ${v.id} · ${esc(v.operador)}${v.status === 'cancelada' ? '<br><b>VENDA CANCELADA</b>' : ''}</div>
   </div>`;
 }
 function imprimirCupom(v) { $('#impressao').innerHTML = cupomHTML(v); setTimeout(() => window.print(), 50); }
+function situacaoNotas(v) {
+  const l = [];
+  const mapa = { autorizada: ['p-ok', 'autorizada'], contingencia: ['p-av', 'em contingência'], rejeitada: ['p-er', 'não emitida'], pendente: ['p-av', 'pendente'], cancelada: ['p-er', 'cancelada'] };
+  if (v.nfce_status && v.nfce_status !== 'sem_nota') l.push(['NFC-e', ...(mapa[v.nfce_status] || ['p-in', v.nfce_status])]);
+  (v.nfse || []).forEach(n => l.push(['NFS-e', ...(mapa[n.status] || ['p-in', n.status])]));
+  return l;
+}
 function mostrarCupom(v, depoisVenda = false) {
-  const st = { autorizada: ['p-ok', 'Autorizada pela SEFAZ'], contingencia: ['p-av', 'Contingência (será transmitida)'], rejeitada: ['p-er', 'Não emitida'] }[v.nfce_status] || ['p-in', v.nfce_status];
   const botoes = [];
-  if (v.nfce_status === 'rejeitada' && v.status === 'ok') botoes.push({ txt: 'Tentar emitir de novo', acao: async () => { const r = await api('venda_reemitir', { id: v.id }); mostrarCupom(r.venda, depoisVenda); atualizarStatus(); } });
+  if (v.nfce_status === 'rejeitada' && v.status === 'ok') botoes.push({ txt: 'Emitir NFC-e de novo', acao: async () => { const r = await api('venda_reemitir', { id: v.id }); mostrarCupom(r.venda, depoisVenda); atualizarStatus(); } });
+  (v.nfse || []).filter(n => n.status === 'rejeitada' && v.status === 'ok').forEach(n => botoes.push({ txt: 'Emitir NFS-e de novo', acao: async () => { const r = await api('nfse_reemitir', { id: n.id }); mostrarCupom(r.venda, depoisVenda); atualizarStatus(); } }));
   if (!depoisVenda && v.status === 'ok') botoes.push({ txt: 'Cancelar venda', cls: 'dan', acao: () => { cancelarVendaUI(v); } });
   botoes.push({ txt: 'Imprimir <kbd>P</kbd>', acao: () => { imprimirCupom(v); return false; } });
   botoes.push({ txt: depoisVenda ? 'Nova venda <kbd>Enter</kbd>' : 'Fechar', cls: 'pri', acao: () => { setTimeout(() => $('#cod')?.focus(), 50); } });
   const troco = +v.troco ? `<div style="text-align:center;font-size:26px;font-weight:800;color:var(--verde);margin-bottom:12px">Troco: ${R(v.troco)}</div>` : '';
-  const m = modal({ titulo: `Venda ${v.id} <span class="pill ${st[0]}" style="margin-left:8px"><i></i>${st[1]}</span>`, corpo: `${troco}${v.nfce_status === 'rejeitada' ? `<p class="p-er" style="padding:10px;border-radius:10px">${esc(v.motivo)}</p>` : ''}${cupomHTML(v)}`, botoes });
+  const pills = situacaoNotas(v).map(([t, cls, txt]) => `<span class="pill ${cls}" style="margin-left:8px"><i></i>${t} ${txt}</span>`).join('');
+  const erros = [v.nfce_status === 'rejeitada' ? 'NFC-e: ' + v.motivo : '', ...(v.nfse || []).filter(n => n.status === 'rejeitada').map(n => 'NFS-e: ' + n.motivo)].filter(Boolean);
+  const m = modal({ titulo: `Venda ${v.id} ${pills}`, corpo: `${troco}${erros.map(e => `<p class="p-er" style="padding:10px;border-radius:10px">${esc(e)}</p>`).join('')}${cupomHTML(v)}`, botoes });
   m.el.addEventListener('keydown', e => { if (e.key.toLowerCase() === 'p' && e.target.tagName !== 'INPUT') imprimirCupom(v); if (e.key === 'Enter' && e.target.tagName !== 'BUTTON') $('footer .pri', m.el).click(); });
   setTimeout(() => $('footer .pri', m.el)?.focus(), 60);
   if (depoisVenda && S.cfg.impressao_auto === '1') imprimirCupom(v);
 }
 async function cancelarVendaUI(v) {
-  const m = modal({ titulo: 'Cancelar venda ' + v.id, corpo: `<p style="margin-top:0">Total ${R(v.total)}. O estoque volta e a NFC-e é cancelada na SEFAZ (até 30 minutos após a emissão).</p><div class="campo"><label>Motivo (mín. 15 letras)</label><input id="jus" value="Cliente desistiu da compra no caixa"></div>`,
+  const m = modal({ titulo: 'Cancelar venda ' + v.id, corpo: `<p style="margin-top:0">Total ${R(v.total)}. O estoque volta e as notas são canceladas (a NFC-e só até 30 minutos após a emissão; a NFS-e conforme o prazo da prefeitura).</p><div class="campo"><label>Motivo (mín. 15 letras)</label><input id="jus" value="Cliente desistiu da compra no caixa"></div>`,
     botoes: [{ txt: 'Voltar' }, { txt: 'Cancelar venda', cls: 'dan', acao: async f => { const r = await comGerente(pin => api('venda_cancelar', { id: v.id, justificativa: $('#jus', f).value, pin }), 'Cancelar venda'); toast(r.msg, 'ok'); if (S.tela === 'vendas') telaVendas(); } }] });
 }
 async function movCaixa(tipo) {
@@ -621,33 +666,43 @@ async function telaPainel(per = ler('per', 'mes')) {
 async function telaProdutos() {
   $('#topoExtra').innerHTML = `<button class="btn sm" id="imp">Importar planilha</button><button class="btn sm pri" id="novo">+ Novo produto</button>`;
   $('#novo').onclick = () => editarProduto({}); $('#imp').onclick = importarPlanilha;
+  if ((S.cfg.emissao || 'nfce') === 'nfse') $('#novo').textContent = '+ Novo serviço';
   $('#tela').innerHTML = `<div class="card"><div class="linha" style="margin-bottom:10px"><input id="pb" placeholder="Buscar por nome, código ou categoria" style="flex:1"><select id="pf" style="width:auto"><option value="">Todos</option><option value="baixo">Estoque baixo</option><option value="validade">Validade próxima</option><option value="semncm">Sem NCM</option></select></div>
     <div class="tabela"><table><thead><tr><th>Produto</th><th>Código</th><th class="r">Custo</th><th class="r">Preço</th><th class="r">Margem</th><th class="r">Estoque</th><th>Validade</th></tr></thead><tbody id="pl"></tbody></table></div></div>`;
   let tm; const carrega = async () => {
     const r = await api('produtos', { busca: $('#pb').value }); const f = $('#pf').value; const lim = new Date(Date.now() + 15 * 864e5).toLocaleDateString('sv-SE');
     const l = r.lista.filter(p => !f || (f === 'baixo' && +p.minimo && +p.estoque <= +p.minimo) || (f === 'validade' && p.validade && p.validade <= lim) || (f === 'semncm' && (!p.ncm || p.ncm === '00000000')));
     $('#pl').innerHTML = l.map(p => { const mg = +p.preco ? ((p.preco - p.custo) / p.preco * 100) : 0;
-      return `<tr class="cl" data-id="${p.id}"><td><b>${esc(p.nome)}</b><div class="ajuda">${esc(p.categoria || '')}${p.promo_qtd ? ` · promoção: ${QT(p.promo_qtd)}+ por ${R(p.promo_preco)}` : ''}</div></td><td>${esc(p.codigo || (p.cod_balanca ? 'balança ' + p.cod_balanca : '—'))}</td>
+      return `<tr class="cl" data-id="${p.id}"><td><b>${esc(p.nome)}</b>${p.tipo === 'servico' ? ' <span class="chip p-in">serviço</span>' : ''}<div class="ajuda">${esc(p.categoria || '')}${p.promo_qtd ? ` · promoção: ${QT(p.promo_qtd)}+ por ${R(p.promo_preco)}` : ''}</div></td><td>${esc(p.codigo || (p.cod_balanca ? 'balança ' + p.cod_balanca : '—'))}</td>
       <td class="r">${R(p.custo)}</td><td class="r"><b>${R(p.preco)}</b></td><td class="r ${mg < 15 ? 'desce' : ''}">${mg.toFixed(0)}%</td>
-      <td class="r ${+p.minimo && +p.estoque <= +p.minimo ? 'desce' : ''}"><b>${QT(p.estoque, p.unidade)}</b> ${esc(p.unidade)}</td><td class="${p.validade && p.validade <= lim ? 'desce' : ''}">${p.validade ? p.validade.split('-').reverse().join('/') : ''}</td></tr>`; }).join('') || '<tr><td colspan="7" class="vazio">Nenhum produto</td></tr>';
+      <td class="r ${+p.minimo && +p.estoque <= +p.minimo ? 'desce' : ''}">${p.tipo === 'servico' ? '—' : `<b>${QT(p.estoque, p.unidade)}</b> ${esc(p.unidade)}`}</td><td class="${p.validade && p.validade <= lim ? 'desce' : ''}">${p.validade ? p.validade.split('-').reverse().join('/') : ''}</td></tr>`; }).join('') || '<tr><td colspan="7" class="vazio">Nenhum produto</td></tr>';
     $$('#pl tr[data-id]').forEach(tr => tr.onclick = () => editarProduto(l.find(p => p.id == tr.dataset.id)));
   };
   $('#pb').oninput = () => { clearTimeout(tm); tm = setTimeout(carrega, 200); }; $('#pf').onchange = carrega; carrega();
 }
 function editarProduto(p) {
   const c = (k, rot, tipo = 'text', ex = '') => `<div class="campo"><label>${rot}</label><input data-k="${k}" type="${tipo}" value="${esc(p[k] ?? '')}" ${ex}></div>`;
-  const m = modal({ titulo: p.id ? 'Editar produto' : 'Novo produto', lg: true, corpo: `
-    <div class="grid g2">${c('nome', 'Nome do produto')}${c('codigo', 'Código de barras', 'text', 'placeholder="Bipe aqui"')}</div>
+  const emi = S.cfg.emissao || 'nfce';
+  if (!p.id) p = { tipo: emi === 'nfse' ? 'servico' : 'produto', ctribnac: S.cfg.nfse_ctribnac_padrao || '', ...p };
+  const m = modal({ titulo: p.id ? 'Editar item' : (emi === 'nfse' ? 'Novo serviço' : 'Novo produto'), lg: true, corpo: `
+    ${emi === 'ambos' ? `<div class="campo" style="max-width:320px"><label>Tipo</label><select data-k="tipo" id="pTipo"><option value="produto">Produto (sai na NFC-e)</option><option value="servico">Serviço (sai na NFS-e)</option></select></div>` : `<input type="hidden" data-k="tipo" id="pTipo" value="${emi === 'nfse' ? 'servico' : 'produto'}">`}
+    <div class="grid g2">${c('nome', 'Nome')}${c('codigo', 'Código de barras', 'text', 'placeholder="Bipe aqui (opcional para serviço)"')}</div>
+    <div id="pServ" class="card" style="box-shadow:none;border:1px solid var(--linha);margin-bottom:12px"><b>Dados da NFS-e</b>
+      <div class="grid g2" style="margin-top:8px">${c('ctribnac', 'Código de tributação nacional (6 números)', 'text', 'maxlength="9" placeholder="ex.: 060101"')}${c('nbs', 'Código NBS (opcional, 9 números)', 'text', 'maxlength="9"')}</div>
+      <p class="ajuda">O código de tributação nacional vem da lista de serviços da Lei Complementar 116 (item + subitem + desdobro). Confirme com o contador: ele aparece também nas notas que a empresa já emite. Exemplos: 06.01.01 cabeleireiro/barbeiro, 06.02.01 manicure/esteticista, 14.01.01 manutenção de máquinas e equipamentos.</p></div>
     <div class="grid g4">${c('preco', 'Preço de venda', 'number', 'step="0.01"')}${c('custo', 'Custo', 'number', 'step="0.0001"')}<div class="campo"><label>Unidade</label><select data-k="unidade"><option>UN</option><option>KG</option><option>LT</option><option>CX</option><option>PCT</option><option>DZ</option></select></div>${c('categoria', 'Categoria')}</div>
     <div class="grid g4">${c('estoque', 'Estoque atual', 'number', 'step="0.001"')}${c('minimo', 'Estoque mínimo', 'number', 'step="0.001"')}${c('validade', 'Validade (lote atual)', 'date')}${c('cod_balanca', 'Código na balança', 'text', 'placeholder="só p/ etiqueta de peso"')}</div>
     <div class="grid g4">${c('promo_qtd', 'Promoção: a partir de (qtd)', 'number')}${c('promo_preco', 'Preço unitário na promoção', 'number', 'step="0.01"')}<div class="campo" style="grid-column:span 2"><label>Margem</label><div id="mg" style="font-size:20px;font-weight:800;padding-top:6px"></div></div></div>
-    <details ${p.id ? '' : 'open'}><summary style="cursor:pointer;font-weight:700;margin:6px 0 12px">Dados fiscais (NFC-e)</summary>
+    <details id="pFisc" ${p.id ? '' : 'open'}><summary style="cursor:pointer;font-weight:700;margin:6px 0 12px">Dados fiscais (NFC-e)</summary>
       <div class="grid g4">${c('ncm', 'NCM (8 dígitos)', 'text', 'maxlength="8"')}${c('cfop', 'CFOP', 'text', 'placeholder="5102"')}${c('csosn', 'CSOSN', 'text', 'placeholder="102"')}${c('cest', 'CEST')}</div>
       <div class="grid g4"><div class="campo"><label>Origem</label><select data-k="origem"><option value="0">0 - Nacional</option><option value="1">1 - Importado direto</option><option value="2">2 - Importado (mercado interno)</option></select></div>${c('trib_aprox', '% tributos aprox. (IBPT)', 'number', 'step="0.01"')}</div>
       <p class="ajuda">Confira NCM, CFOP e CSOSN com o contador. Itens com substituição tributária (bebidas, por exemplo) normalmente usam CSOSN 500 e CFOP 5405.</p></details>`,
     botoes: [...(p.id ? [{ txt: 'Excluir', cls: 'dan', acao: async () => { if (!await confirmar('Excluir', `Excluir <b>${esc(p.nome)}</b>?`, 'Excluir', 'dan')) return false; await comGerente(pin => api('produto_excluir', { id: p.id, pin })); toast('Excluído.', 'ok'); telaProdutos(); } }] : []),
       { txt: 'Salvar', cls: 'pri', acao: async f => { const d = { id: p.id }; $$('[data-k]', f).forEach(i => d[i.dataset.k] = i.value.trim()); await comGerente(pin => api('produto_salvar', { ...d, pin })); toast('Produto salvo.', 'ok'); if (S.tela === 'produtos') telaProdutos(); } }] });
   $$('select[data-k]', m.el).forEach(s => { if (p[s.dataset.k] != null) s.value = p[s.dataset.k]; });
+  const tipo = () => { const sv = $('#pTipo', m.el).value === 'servico'; $('#pServ', m.el).classList.toggle('hide', !sv); $('#pFisc', m.el).classList.toggle('hide', sv);
+    $$('[data-k=estoque],[data-k=minimo],[data-k=validade],[data-k=cod_balanca]', m.el).forEach(i => i.closest('.campo').classList.toggle('hide', sv)); };
+  $('#pTipo', m.el).onchange = tipo; tipo();
   const mg = () => { const pr = +$('[data-k=preco]', m.el).value, cu = +$('[data-k=custo]', m.el).value; $('#mg', m.el).innerHTML = pr ? `${((pr - cu) / pr * 100).toFixed(1).replace('.', ',')}% <span class="ajuda">(lucro ${R(pr - cu)} por unidade)</span>` : '—'; };
   $('[data-k=preco]', m.el).oninput = mg; $('[data-k=custo]', m.el).oninput = mg; mg();
 }
@@ -722,10 +777,10 @@ async function telaVendas() {
   const stc = { demo: 'p-in', autorizada: 'p-ok', contingencia: 'p-av', rejeitada: 'p-er', pendente: 'p-av' };
   const stn = { demo: 'Simulada', autorizada: 'Autorizada', contingencia: 'Contingência', rejeitada: 'Não emitida', pendente: 'Pendente' };
   $('#tela').innerHTML = `<div class="grid g4" style="margin-bottom:16px"><div class="card kpi"><div class="rot">Vendas</div><div class="val">${ok.length}</div></div><div class="card kpi"><div class="rot">Total</div><div class="val">${R(ok.reduce((s, v) => s + +v.total, 0))}</div></div>
-    <div class="card kpi"><div class="rot">Canceladas</div><div class="val">${r.lista.length - ok.length}</div></div><div class="card kpi"><div class="rot">Notas com problema</div><div class="val ${ok.some(v => v.nfce_status === 'rejeitada') ? 'desce' : ''}">${ok.filter(v => ['rejeitada', 'contingencia'].includes(v.nfce_status)).length}</div></div></div>
-    <div class="card"><div class="tabela"><table><thead><tr><th>Data</th><th>Venda</th><th>NFC-e</th><th>Pagamento</th><th>Operador</th><th class="r">Total</th><th>Situação</th></tr></thead><tbody>
+    <div class="card kpi"><div class="rot">Canceladas</div><div class="val">${r.lista.length - ok.length}</div></div><div class="card kpi"><div class="rot">Notas com problema</div><div class="val ${ok.some(v => v.nfce_status === 'rejeitada' || /rejeitada/.test(v.nfse_st || '')) ? 'desce' : ''}">${ok.filter(v => ['rejeitada', 'contingencia'].includes(v.nfce_status) || /rejeitada|pendente/.test(v.nfse_st || '')).length}</div></div></div>
+    <div class="card"><div class="tabela"><table><thead><tr><th>Data</th><th>Venda</th><th>Nº NFC-e</th><th>Pagamento</th><th>Operador</th><th class="r">Total</th><th>Situação</th></tr></thead><tbody>
     ${r.lista.map(v => `<tr class="cl" data-id="${v.id}"><td>${dataBR(v.data)}</td><td>${v.id}</td><td>${v.numero ? v.numero + '/' + v.serie : '—'}</td><td>${esc((v.formas || '').split(', ').map(f => FORMAS[f] || f).join(', '))}</td><td>${esc(v.operador)}</td><td class="r"><b>${R(v.total)}</b></td>
-      <td>${v.status === 'cancelada' ? '<span class="chip p-er">Cancelada</span>' : `<span class="chip ${stc[v.nfce_status] || 'p-in'}" title="${esc(v.motivo || '')}">${stn[v.nfce_status] || esc(v.nfce_status)}</span>`}</td></tr>`).join('') || '<tr><td colspan="7" class="vazio">Nenhuma venda no período</td></tr>'}</tbody></table></div></div>`;
+      <td>${v.status === 'cancelada' ? '<span class="chip p-er">Cancelada</span>' : situacaoNotas({ nfce_status: v.nfce_status, nfse: (v.nfse_st || '').split(',').filter(Boolean).map(status => ({ status })) }).map(([t, cls, txt]) => `<span class="chip ${cls}" title="${esc(v.motivo || '')}" style="margin:1px">${t} ${txt}</span>`).join(' ') || '<span class="chip p-in">sem nota</span>'}</td></tr>`).join('') || '<tr><td colspan="7" class="vazio">Nenhuma venda no período</td></tr>'}</tbody></table></div></div>`;
   $$('#tela tr[data-id]').forEach(tr => tr.onclick = async () => mostrarCupom((await api('venda', { id: tr.dataset.id })).venda));
 }
 
@@ -755,11 +810,16 @@ async function telaConfig() {
     <div class="card"><h2>Empresa</h2><div class="grid g2">${f('emp_cnpj', 'CNPJ')}${f('emp_ie', 'Inscrição Estadual')}</div><div class="grid g2">${f('emp_razao', 'Razão social')}${f('emp_fantasia', 'Nome fantasia')}</div>
       <div class="grid g3">${f('emp_logradouro', 'Endereço')}${f('emp_numero', 'Número')}${f('emp_bairro', 'Bairro')}</div><div class="grid g4">${f('emp_municipio', 'Cidade')}${f('emp_uf', 'UF')}${f('emp_cep', 'CEP')}${f('emp_cmun', 'Cód. IBGE')}</div>
       ${sel('emp_crt', 'Regime', [['1', 'Simples Nacional'], ['4', 'MEI'], ['3', 'Regime normal']])}</div>
-    <div class="card"><h2>Nota fiscal (NFC-e)</h2>${sel('ambiente', 'Ambiente', [['homologacao', 'Teste na SEFAZ (homologação)'], ['producao', 'Produção (valendo)']])}
-      <div class="grid g2">${f('nfce_serie', 'Série', 'number')}${f('nfce_numero', 'Próximo número', 'number')}</div><div class="grid g2">${f('csc', 'CSC', 'password')}${f('csc_id', 'ID do CSC')}</div>
+    <div class="card"><h2>Nota fiscal</h2>${sel('emissao', 'O que a empresa emite', [['nfce', 'Só produtos (NFC-e)'], ['nfse', 'Só serviços (NFS-e)'], ['ambos', 'Produtos e serviços (NFC-e + NFS-e)']])}
+      ${sel('ambiente', 'Ambiente', [['homologacao', 'Teste (homologação)'], ['producao', 'Produção (valendo)']])}
+      <details ${(c.emissao || 'nfce') !== 'nfse' ? 'open' : ''}><summary style="cursor:pointer;font-weight:700;margin:4px 0 10px">NFC-e (produtos)</summary>
+      <div class="grid g2">${f('nfce_serie', 'Série', 'number')}${f('nfce_numero', 'Próximo número', 'number')}</div><div class="grid g2">${f('csc', 'CSC', 'password')}${f('csc_id', 'ID do CSC')}</div></details>
+      <details ${(c.emissao || 'nfce') !== 'nfce' ? 'open' : ''}><summary style="cursor:pointer;font-weight:700;margin:4px 0 10px">NFS-e (serviços)</summary>
+      <div class="grid g3">${f('nfse_im', 'Inscrição municipal')}${f('nfse_serie', 'Série da DPS', 'number')}${f('nfse_numero', 'Próximo nº da DPS', 'number')}</div>
+      ${sel('nfse_regesptrib', 'Regime especial de tributação', [['0', 'Nenhum'], ['1', 'Ato cooperado'], ['2', 'Estimativa'], ['3', 'Microempresa municipal'], ['4', 'Notário ou registrador'], ['5', 'Profissional autônomo'], ['6', 'Sociedade de profissionais'], ['9', 'Outros']])}</details>
       <div class="card" style="box-shadow:none;border:1px solid var(--linha);padding:12px;margin-bottom:12px"><b>Certificado A1</b> ${c.cert_validade ? `<span class="pill ${new Date(c.cert_validade) - Date.now() < 30 * 864e5 ? 'p-er' : 'p-ok'}"><i></i>válido até ${c.cert_validade.split('-').reverse().join('/')}</span>` : '<span class="pill p-av"><i></i>não enviado</span>'}
         <div class="linha" style="margin-top:8px"><input type="file" id="cfc" accept=".pfx,.p12" style="flex:1"><input type="password" id="cfs" placeholder="Senha" style="width:140px"><button class="btn" id="cfe">Enviar</button></div></div>
-      <div class="linha"><button class="btn" id="tsf">Testar conexão com a SEFAZ</button><span id="tsr" class="ajuda"></span></div>
+      <div class="linha"><button class="btn" id="tsf">Testar conexão</button><span id="tsr" class="ajuda"></span></div>
       ${est.biblioteca ? '' : '<p class="p-av" style="padding:10px;border-radius:10px;margin-top:10px">Biblioteca fiscal não encontrada: reinstale o PDV pelo botão <b>Baixe aqui</b> do site.</p>'}</div>
     <div class="card"><h2>Maquininha</h2>${sel('maquininha', 'Tipo', [['manual', 'Separada (caixa digita e confirma)'], ['stone', 'Stone integrada (Stone Connect)'], ['mp', 'Mercado Pago Point integrada']])}
       <details ${c.maquininha === 'stone' ? 'open' : ''}><summary style="cursor:pointer;font-weight:700;margin:4px 0 10px">Stone</summary>${f('stone_sk', 'Secret Key da loja (Partner Hub ou Pagar.me > Desenvolvimento > Chaves)', 'password')}${f('stone_parceiro', 'Seu ID de parceiro Stone (ServiceRefererName)')}${f('stone_serial', 'Número de série da maquininha (etiqueta atrás)')}
@@ -777,7 +837,7 @@ async function telaConfig() {
   </div><div style="position:sticky;bottom:0;padding:14px 0;text-align:right"><button class="btn pri lg" id="sv">Salvar configurações</button></div>`;
   $('#sv').onclick = async () => { const d = {}; $$('#tela [data-k]').forEach(i => d[i.dataset.k] = i.value.trim()); try { const r = await api('config_salvar', d); S.cfg = r.config; toast('Configurações salvas.', 'ok'); atualizarStatus(); $('#nomeLoja').textContent = S.cfg.emp_fantasia || S.cfg.emp_razao; } catch (e) { toast(e.message, 'er'); } };
   $('#cfe').onclick = async () => { const fl = $('#cfc').files[0]; if (!fl) return toast('Escolha o arquivo .pfx', 'er'); try { const r = await api('certificado', { senha: $('#cfs').value }, fl); toast('Certificado válido até ' + r.info.validade.split('-').reverse().join('/'), 'ok'); telaConfig(); } catch (e) { toast(e.message, 'er'); } };
-  $('#tsf').onclick = async () => { $('#tsr').textContent = 'Testando…'; try { const r = await api('sefaz_status'); $('#tsr').innerHTML = `<b class="${r.ok ? 'sobe' : 'desce'}">${esc(r.msg)}</b>`; } catch (e) { $('#tsr').innerHTML = `<b class="desce">${esc(e.message)}</b>`; } };
+  $('#tsf').onclick = async () => { $('#tsr').textContent = 'Testando… (salve antes se mudou algo)'; try { const r = await api('sefaz_status'); $('#tsr').innerHTML = (r.itens || []).map(x => `<b class="${x.ok ? 'sobe' : 'desce'}">${esc(x.tipo)}: ${esc(x.msg)}</b>`).join('<br>') || `<b>${esc(r.msg)}</b>`; } catch (e) { $('#tsr').innerHTML = `<b class="desce">${esc(e.message)}</b>`; } };
   $('#mpb').onclick = async () => { try { await api('config_salvar', { mp_token: $('[data-k=mp_token]').value }); const r = await api('mp_terminais'); $('#mpt').innerHTML = r.lista.map(t => `<option value="${esc(t.id)}">${esc(t.id)} (${esc(t.modo)})</option>`).join('') || '<option value="">Nenhuma encontrada</option>'; toast(r.lista.length + ' maquininha(s). Escolha e salve.', 'ok'); } catch (e) { toast(e.message, 'er'); } };
   $('#bk').onclick = () => { location.href = 'api.php?acao=backup'; };
   $('#zr').onclick = () => modal({ titulo: 'Zerar o sistema', corpo: `<p style="margin-top:0">Isso <b>apaga tudo</b> (vendas, produtos, clientes, configurações e certificado). Não tem como desfazer. <b>Baixe a cópia de segurança antes.</b></p><div class="campo"><label>Senha do gerente</label><input id="zp" type="password" inputmode="numeric"></div><div class="campo"><label>Digite ZERAR para confirmar</label><input id="zc" autocomplete="off"></div>`,

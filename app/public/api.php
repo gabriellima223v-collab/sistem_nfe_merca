@@ -23,6 +23,7 @@ require dirname(__DIR__) . '/app/db.php';
 require dirname(__DIR__) . '/app/fiscal.php';
 require dirname(__DIR__) . '/app/extras.php';
 require dirname(__DIR__) . '/app/licenca.php';
+require dirname(__DIR__) . '/app/nfse.php';
 
 header('Content-Type: application/json; charset=utf-8');
 $acao = $_GET['acao'] ?? '';
@@ -61,7 +62,7 @@ try {
     if (cfg('configurado') === '1') gerente();
     $perm = ['emp_cnpj','emp_razao','emp_fantasia','emp_ie','emp_crt','emp_logradouro','emp_numero','emp_complemento','emp_bairro','emp_cmun','emp_municipio','emp_uf','emp_cep','emp_fone',
       'csc','csc_id','ambiente','nfce_serie','nfce_numero','maquininha','mp_token','mp_terminal','balanca_cod_ini','balanca_cod_len','balanca_val_ini','balanca_val_len','balanca_tipo',
-      'resp_cnpj','resp_nome','resp_email','resp_fone','stone_sk','stone_parceiro','stone_serial','whats_dono','impressao_auto','cnpj_credenciadora','configurado','msg_cupom'];
+      'resp_cnpj','resp_nome','resp_email','resp_fone','stone_sk','stone_parceiro','stone_serial','emissao','nfse_im','nfse_serie','nfse_numero','nfse_regesptrib','nfse_ctribnac_padrao','whats_dono','impressao_auto','cnpj_credenciadora','configurado','msg_cupom'];
     $vals = array_intersect_key($in, array_flip($perm));
     if (isset($vals['stone_sk'])) { if (str_contains($vals['stone_sk'], '•')) unset($vals['stone_sk']); else $vals['stone_sk'] = segredo(trim($vals['stone_sk']), true); }
     if (isset($vals['mp_token'])) { if (str_contains($vals['mp_token'], '•')) unset($vals['mp_token']); else $vals['mp_token'] = segredo(trim($vals['mp_token']), true); }
@@ -78,7 +79,11 @@ try {
     cfgSet(['cert_senha' => segredo((string)$in['senha'], true), 'cert_validade' => $info['validade'], 'cert_nome' => $info['nome'], 'cert_cnpj' => $info['cnpj']]);
     ok(['info' => $info]);
   case 'validar_gerente': gerente((string)($in['pin'] ?? '')); ok();
-  case 'sefaz_status': ok(sefazStatus());
+  case 'sefaz_status':
+    $res = [];
+    if (emiteNFCe()) { try { $r = sefazStatus(); $res[] = ['tipo' => 'NFC-e (SEFAZ)', 'ok' => $r['ok'], 'msg' => $r['msg']]; } catch (Throwable $e) { $res[] = ['tipo' => 'NFC-e (SEFAZ)', 'ok' => false, 'msg' => $e->getMessage()]; } }
+    if (emiteNFSe()) { try { $r = nfseTestar(); $res[] = ['tipo' => 'NFS-e (Receita/Prefeitura)', 'ok' => $r['ok'], 'msg' => $r['msg']]; } catch (Throwable $e) { $res[] = ['tipo' => 'NFS-e (Receita/Prefeitura)', 'ok' => false, 'msg' => $e->getMessage()]; } }
+    ok(['ok' => !in_array(false, array_column($res, 'ok'), true), 'msg' => implode(' | ', array_map(fn($x) => $x['tipo'] . ': ' . $x['msg'], $res)), 'itens' => $res]);
   case 'zerar_dados':
     // Zera o sistema: apaga vendas, produtos, configuração e certificado, mas mantém a licença ativada
     $g = gerente((string)($in['pin'] ?? ''));
@@ -110,9 +115,11 @@ try {
   case 'produto_codigo': usuario(); ok(buscarPorCodigo(trim((string)$in['codigo'])));
   case 'produto_salvar':
     $u = gerente($in['pin'] ?? null);
-    $c = ['codigo','cod_balanca','nome','unidade','preco','custo','estoque','minimo','validade','ncm','cfop','csosn','cest','origem','trib_aprox','categoria','promo_qtd','promo_preco'];
+    $c = ['codigo','cod_balanca','nome','unidade','preco','custo','estoque','minimo','validade','ncm','cfop','csosn','cest','origem','trib_aprox','categoria','promo_qtd','promo_preco','tipo','ctribnac','nbs'];
     $d = []; foreach ($c as $k) $d[$k] = isset($in[$k]) && $in[$k] !== '' ? $in[$k] : null;
     if (!$d['nome']) erro('Informe o nome do produto.');
+    if (($d['tipo'] ?? 'produto') === 'servico' && strlen(soDigitos($d['ctribnac'] ?? '')) !== 6) erro('Informe o código de tributação nacional do serviço (6 números).');
+    if (($d['tipo'] ?? '') === 'servico') { $d['estoque'] = $d['estoque'] ?? 0; $d['unidade'] = $d['unidade'] ?: 'UN'; }
     if ($d['codigo'] && qv('SELECT id FROM produtos WHERE codigo=? AND ativo=1 AND id<>?', [$d['codigo'], (int)($in['id'] ?? 0)])) erro('Já existe um produto com esse código de barras.');
     $d['atualizado'] = agora();
     if (!empty($in['id'])) { $set = implode(',', array_map(fn($k) => "$k=?", array_keys($d))); ex("UPDATE produtos SET $set WHERE id=?", [...array_values($d), $in['id']]); $id = (int)$in['id']; }
@@ -159,9 +166,13 @@ try {
   case 'venda': usuario(); ok(['venda' => vendaCompleta((int)$in['id'])]);
   case 'vendas':
     usuario(); $de = ($in['de'] ?? date('Y-m-d')) . ' 00:00:00'; $ate = ($in['ate'] ?? date('Y-m-d')) . ' 23:59:59';
-    ok(['lista' => q("SELECT v.*, (SELECT GROUP_CONCAT(forma,', ') FROM venda_pag WHERE venda_id=v.id) formas FROM vendas v WHERE data BETWEEN ? AND ? ORDER BY id DESC", [$de, $ate])]);
+    ok(['lista' => q("SELECT v.*, (SELECT GROUP_CONCAT(forma,', ') FROM venda_pag WHERE venda_id=v.id) formas, (SELECT GROUP_CONCAT(status,',') FROM nfse WHERE venda_id=v.id) nfse_st FROM vendas v WHERE data BETWEEN ? AND ? ORDER BY id DESC", [$de, $ate])]);
   case 'venda_cancelar': $g = gerente($in['pin'] ?? null); ok(cancelarVenda((int)$in['id'], (string)($in['justificativa'] ?? ''), $g));
-  case 'contingencia_transmitir': usuario(); ok(transmitirContingencias());
+  case 'contingencia_transmitir':
+    usuario(); $a = emiteNFCe() ? transmitirContingencias() : ['enviadas' => 0, 'pendentes' => 0];
+    $b = emiteNFSe() ? nfsePendentes() : ['enviadas' => 0, 'pendentes' => 0];
+    ok(['enviadas' => $a['enviadas'] + $b['enviadas'], 'pendentes' => $a['pendentes'] + $b['pendentes']]);
+  case 'nfse_reemitir': usuario(); $n = nfseReemitir((int)$in['id']); ok(['nfse' => $n, 'venda' => vendaCompleta((int)$n['venda_id'])]);
   case 'xml_exportar':
     gerente(); $arq = exportarXML((string)$in['mes']);
     header('Content-Type: application/zip'); header('Content-Disposition: attachment; filename="' . basename($arq) . '"'); readfile($arq); exit;
