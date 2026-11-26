@@ -40,9 +40,11 @@ Aparece o assistente com duas opções:
    têm valor fiscal. Quando estiver tudo certo, troque para "Produção"
    em Configurações.
 
-Para sair da demonstração e configurar a loja de verdade: feche o
-programa, rode C:\PDV\Desligar servidor.bat, apague a pasta
-C:\PDV\dados e abra de novo pelo ícone.  (Apagar a pasta dados apaga TUDO: vendas, produtos etc.)
+Para sair da demonstração e configurar a loja de verdade:
+Configurações > "Sair da demonstração e configurar a loja" (senha do
+gerente + digitar ZERAR). A licença continua ativada.
+NUNCA apague a pasta C:\PDV\dados na mão: ela guarda a identificação
+do computador usada pela licença.
 
 
 --------------------------------------------------------------

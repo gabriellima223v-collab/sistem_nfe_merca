@@ -81,6 +81,18 @@ try {
   case 'demo_carregar':
     if (cfg('configurado') === '1') gerente();
     carregarDemo(); ok();
+  case 'zerar_dados':
+    // Sai da demonstração: apaga vendas, produtos, configuração e certificado, mas mantém a licença ativada
+    $g = gerente((string)($in['pin'] ?? ''));
+    if (($in['confirmacao'] ?? '') !== 'ZERAR') erro('Digite ZERAR para confirmar.');
+    $pdo = db(); $pdo->exec('PRAGMA wal_checkpoint(TRUNCATE)');
+    foreach (['vendas', 'venda_itens', 'venda_pag', 'produtos', 'clientes', 'fiado_mov', 'caixas', 'caixa_mov', 'entradas', 'conciliacao', 'log', 'config', 'usuarios'] as $t) $pdo->exec("DELETE FROM $t");
+    $pdo->exec("INSERT INTO usuarios (nome,pin,perfil) VALUES ('Gerente','" . password_hash('1234', PASSWORD_DEFAULT) . "','gerente')");
+    $pdo->exec('VACUUM');
+    $apagar = function ($dir) use (&$apagar) { foreach (glob($dir . '/*') ?: [] as $f) { is_dir($f) ? ($apagar($f) || @rmdir($f)) : @unlink($f); } };
+    $apagar(DADOS . '/xml'); $apagar(DADOS . '/certificado');
+    @mkdir(DADOS . '/xml/contingencia', 0775, true); @mkdir(DADOS . '/certificado', 0775, true);
+    session_destroy(); ok();
   case 'usuarios': gerente(); ok(['lista' => q('SELECT id,nome,perfil,ativo FROM usuarios')]);
   case 'usuario_salvar':
     gerente();
